@@ -1,0 +1,478 @@
+---
+title: "PCA Sleep Health and Lifestyle V01"
+author: "Equipo 6"
+date: "2025-08-10"
+output: html_document
+---
+# Introducción
+
+# Objetivo
+
+# Dataset Overview
+
+El conjunto de datos sobre salud del sueño y estilo de vida consta de 400 filas y 13 columnas, que cubren una amplia gama de variables relacionadas con el sueño y los hábitos diarios.
+
+### Descripción de las variables
+
+- ID de Persona: Un identificador para cada individuo.
+- Género: El género de la persona (Hombre/Mujer).
+- Edad: La edad de la persona en años.
+- Ocupación: La ocupación o profesión de la persona.
+- Duración del Sueño (horas): El número de horas que la persona duerme al día.
+- Calidad del Sueño (escala: 1-10): Una calificación subjetiva de la calidad del sueño, del 1 al 10.
+- Nivel de Actividad Física (minutos/día): El número de minutos que la persona realiza actividad física diariamente.
+- Nivel de Estrés (escala: 1-10): Una calificación subjetiva del nivel de estrés que experimenta la persona, del 1 al 10.
+- Categoría de IMC: La categoría de IMC de la persona (p. ej., Bajo Peso, Normal, Sobrepeso).
+- Presión Arterial (Sistólica/Diastólica): La medición de la presión arterial de la persona, indicada como presión sistólica sobre presión diastólica. Frecuencia cardíaca (lpm): Frecuencia cardíaca en reposo de la persona    en latidos por minuto.
+- Pasos diarios: Número de pasos que da la persona al día.
+- Trastorno del sueño: Presencia o ausencia de un trastorno del sueño en la persona (ninguno, insomnio, apnea del sueño).
+
+### Details about Sleep Disorder Column:
+
+- None: The individual does not exhibit any specific sleep disorder.
+- Insomnia: The individual experiences difficulty falling asleep or staying asleep, leading to inadequate or poor-quality sleep.
+- Sleep Apnea: The individual suffers from pauses in breathing during sleep, resulting in disrupted sleep patterns and potential health risks.
+
+## Tareas 
+
+## Activiamos librerías
+```{r}
+source('R-libraries-ICdD.r')
+```
+
+## Importamos la información
+```{r}
+df<- read_csv("Sleep_health_and_lifestyle.csv") %>% data.frame()
+```
+## Hagamo un EDA de los datos
+
+```{r}
+df |> dim()
+```
+
+Si bien la documentación de la BDD menciona 400 observaciones, el documento tiene 374 y, 12 variables en lugar de 13, la adicional es el ID
+
+```{r}
+df |>head(10)
+```
+
+La variable Blood Preassure hay que ajustarla porque es una medida cuantitativa que se cargó como caracter. Hagamos la separación de los registros como Sistólica y Diastólica para incluirla de manera adecuada 
+
+```{r}
+df <- df %>%
+  separate(Blood.Pressure, into = c("sistolica_bp", "diastolica_bp"), sep = "/", convert = TRUE)
+df |> head(10)
+```
+
+### Composición de la tabla de datos
+
+```{r}
+df |> vis_dat()
+```
+
+No encontramos datos pérdidos, por lo que en este sentido no hace falta pre procesamiento de datos adicional a las variables categoricas
+
+#### 
+
+La información no tiene datos pérdidos, pero si encontramos 5 columnas de tipo carácter, por lo que no es posible aplicar de manera directa la matriz de correlación y en consecuncia PCA, por lo que debemos pasar por un pre procesamiento de datos. En caso especial, la variable "Blood Pressure" es continua pero se cladifica como caracter, por lo que debemos separarla en dos columnas numéricas: sistólica y diastólica.
+
+Nombramos a la variable "Sleep Disorder" como la variable de clasificación o respuesta de acuerdo al objetivo de la información
+
+```{r}
+df |> dlookr::diagnose()
+```
+
+
+
+
+```{r}
+df |> skimr::skim() |> skimr::yank("numeric")
+```
+
+
+
+```{r}
+df |> plot_num()
+```
+
+```{r}
+df |> skimr::skim() |> skimr::yank("character")
+```
+
+```{r}
+df |> freq()
+```
+
+
+```{r}
+df1 <- df |> dplyr::select(where(is.numeric)) %>% mutate(df$Sleep.Disorder)
+colnames(df1)=c("Age","Sleep.Duration","Quality.of.Sleep","Physical.Activity.Level","Stress.Level","sistolica_bp","diastolica_bp","Heart.Rate","Daily.Steps","Sleep.Disorder")
+```
+
+Cambio a data set Long
+
+```{r}
+df_long <- df1 %>% 
+    pivot_longer(!Sleep.Disorder, names_to = "predictores", values_to = "values")
+df_long |> head()
+```
+Comparación para las variables numéricas versus la de clasificacion o respuesta
+
+```{r}
+
+df_long %>% 
+  ggplot(mapping = aes(x = Sleep.Disorder, y = values, fill = predictores)) +
+  geom_boxplot() + 
+  facet_wrap(~ predictores, scales = "free", ncol = 4) +
+  scale_color_viridis_d(option = "plasma", end = .7) +
+  theme(legend.position = "none") +
+  labs(title = "Comparación vía box-plot")
+
+```
+
+```{r}
+df_long |> ggplot(mapping = aes(values, fill = Sleep.Disorder)) +
+  geom_histogram(color = "white") +
+  facet_wrap(~predictores, scales = "free", ncol= 4) +
+  scale_color_viridis_d(option = "plasma", end = .7) +
+  labs(title = "Variables Distribution") +
+  theme_light()+
+  labs(title = "Comparación vía histograma")
+```
+
+
+```{r}
+df_long |> ggplot(mapping = aes(values, fill = Sleep.Disorder)) +
+  geom_density(color = "white") +
+  facet_wrap(~predictores, scales = "free", ncol= 4) +
+  scale_color_viridis_d(option = "plasma", end = .7) +
+  labs(title = "Variables Distribution") +
+  theme_light()+
+  labs(title = "Comparación a través de densidad")
+
+```
+
+```{r}
+ggpairs(df1, mapping = aes(color = Sleep.Disorder),columns = seq(1,8),progress = FALSE)
+```
+
+Confirmemos si existe una estructura de Asociación entre las variables
+
+1. Valores de la Matriz de correlación (Correlación de Pearson)
+```{r}
+cor_data<-cor(df1[,-10])
+
+cor1_data<-cor(df1[,-10],method="spearman")
+
+ggcorrplot::ggcorrplot(corr = cor1_data,
+                       type = "lower", 
+                       show.diag = TRUE,
+                       lab = TRUE, 
+                       lab_size = 3)
+```
+2. Determinante de la Matriz
+```{r}
+det(cor1_data)
+```
+
+3. Indicador KMO (cercano a 1, relación fuerte entre las variables)
+
+```{r}
+psych::KMO(cor1_data)
+```
+
+
+4. Prueba que la Matriz es distinta de la Identidad (Rechazar H0, pvalue proximo a Cero) y por lo tanto hay correlación fuera de la diagonal
+```{r}
+psych::cortest.bartlett(cor1_data,n=dim(df1)[1])
+
+```
+
+Nuestra estrucura de Asociación es mediana ya que:
+
+1. La matriz de correlación no es tan cercano a 1 las antradas fuera de la diagonal
+2. El determinante aunque es pequeño (0.000008), no es cero
+3. El indicador KMO, está a la mitad de 1 (KMO=0.53)
+4. Se rechaza H0 de la prueba de Bartlett
+
+Por lo tanto, podemos decir que tiene una estrutura de asociación Mediana
+
+Complementemos la revisión de la estructura de Asociación con la matriz de correlación Policorica
+
+
+# -------------------------------------------------------------------------
+# 3 Matriz de Correlación Policórica con el paquete 'polycor'
+# -------------------------------------------------------------------------
+
+# 3.1. PREPARACIÓN DE LAS VARIABLES ORDINALES (¡Paso Crucial!)
+# La correlación policórica REQUIERE que las variables ordinales estén
+# definidas como "ordered factors" en R.
+
+# Identificamos las variables que son ordinales en tu dataset:
+# - quality_of_sleep (escala numérica, pero representa categorías ordenadas)
+# - stress_level (escala numérica, pero representa categorías ordenadas)
+# - bmi_category (tiene un orden lógico: Normal < Sobrepeso < Obeso)
+
+```{r}
+colnames(df)
+```
+
+
+```{r}
+df_prepared <- df %>%
+  mutate(
+    # Convertimos las variables a factores ordenados
+    quality_of_sleep_ord = factor(Quality.of.Sleep, ordered = TRUE),
+    stress_level_ord = factor(Stress.Level, ordered = TRUE),
+    # Para 'bmi_category', debemos especificar el orden correcto de los niveles
+    bmi_category_ord = factor(BMI.Category, 
+                              levels = c("Normal", "Overweight", "Obese"),
+                              ordered = TRUE)
+  )
+```
+
+# 3.4. SELECCIÓN DE VARIABLES PARA LA MATRIZ
+# Seleccionamos las variables ordinales que creamos y las numéricas relevantes
+# para calcular la matriz de correlación mixta.
+
+```{r}
+vars_for_correlation <- df_prepared %>%
+  select(
+    # Variables Ordinales
+    quality_of_sleep_ord,
+    stress_level_ord,
+    bmi_category_ord,
+    
+    # Variables Continuas/Numéricas
+    Age,
+    Sleep.Duration,
+    Physical.Activity.Level,
+    Heart.Rate,
+    Daily.Steps
+  )
+
+```
+
+
+# 3.5. CÁLCULO DE LA MATRIZ DE CORRELACIÓN HETEROGÉNEA
+# La función hetcor() se encargará de todo automáticamente
+
+```{r}
+correlation_matrix <- hetcor(vars_for_correlation)
+```
+
+# 3.6. VISUALIZACIÓN DE LOS RESULTADOS
+
+```{r}
+print("Matriz de Correlación (Policórica / Poliserial / Pearson):")
+print(correlation_matrix$correlations)
+
+```
+
+3.7. Determinante de la Matriz
+```{r}
+det(correlation_matrix$correlations)
+```
+
+
+3.8 Indicador KMO (cercano a 1, relación fuerte entre las variables)
+
+```{r}
+psych::KMO(correlation_matrix$correlations)
+```
+
+3.9 Prueba que la Matriz es distinta de la Identidad (Rechazar H0, pvalue proximo a Cero) y por lo tanto hay correlación fuera de la diagonal
+```{r}
+psych::cortest.bartlett(correlation_matrix$correlations,n=dim(df1)[1])
+
+```
+
+### Conclusiones / Recap del EDA
+
+# 4. Definir la "receta" de preprocesamiento con tidymodels
+
+```{r}
+base_recipe <-
+  recipe(Sleep.Disorder ~ ., data = df) %>%
+  step_dummy(all_nominal_predictors()) %>%  ###Así trabajarán las categóricas
+  step_normalize(all_predictors()) %>%
+  step_pca(all_predictors(), id = "pca") %>% 
+  prep()
+```
+
+Modelo de PCA
+
+```{r}
+base_recipe_pca <- 
+  base_recipe %>% 
+  tidy(id = "pca") 
+
+base_recipe_pca
+
+```
+
+```{r}
+base_recipe %>% 
+  tidy(id = "pca", type = "variance") %>% 
+  dplyr::filter(terms == "percent variance") %>% 
+  ggplot(aes(x = component, y = value)) + 
+  geom_col(fill = "#B53389") + 
+  xlim(c(0, 30)) + 
+  labs(x="PC", y="% de varianza", title="Scree plot")
+```
+
+```{r}
+base_recipe %>% 
+  tidy(id = "pca", type = "variance") %>% 
+  dplyr::filter(terms == "cumulative percent variance") %>% 
+  ggplot(aes(x = component, y = value)) + 
+  geom_col(fill = "#F25E52") + 
+  xlim(c(0, 30)) + 
+  labs(x="PC", y="% acumulado de varianza", title="Scree plot")
+```
+
+```{r}
+base_recipe_pca %>%
+  mutate(terms = tidytext::reorder_within(terms, 
+                                          abs(value), 
+                                          component)) %>%
+  ggplot(aes(abs(value), terms, fill = value > 0)) +
+  geom_col() +
+  facet_wrap(~component, scales = "free_y") +
+  tidytext::scale_y_reordered() +
+  scale_fill_manual(values = c("#b6dfe2", "#0A537D")) +
+  labs(
+    x = "Absolute value of contribution",
+    y = NULL, fill = "¿Positive?"
+  ) 
+```
+
+
+```{r}
+base_recipe_pca %>%
+  filter(component %in% paste0("PC", 1:11)) %>%
+  mutate(component = fct_inorder(component)) %>%
+  ggplot(aes(value, terms, fill = terms)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~component, nrow = 1) +
+  labs(y = NULL)
+```
+
+```{r}
+base_recipe_pca %>%
+  filter(component %in% paste0("PC", 1:11)) %>%
+  group_by(component) %>%
+  top_n(8, abs(value)) %>%
+  ungroup() %>%
+  mutate(terms = reorder_within(terms, abs(value), component)) %>%
+  ggplot(aes(abs(value), terms, fill = value > 0)) +
+  geom_col() +
+  facet_wrap(~component, scales = "free_y") +
+  scale_y_reordered() +
+  labs(
+    x = "Absolute value of contribution",
+    y = NULL, fill = "¿Positive?"
+  )
+```
+
+```{r}
+juice(base_recipe) %>%
+  ggplot(aes(PC1, PC2, label = Sleep.Disorder)) +
+  #geom_point(aes(color = Sleep.Disorder}), alpha = 0.7, size = 2) +
+  geom_text(check_overlap = TRUE, hjust = "inward", family = "IBMPlexSans") +
+  labs(color = NULL)
+
+```
+
+# Ahora procesomos con UMAP con Recipe
+
+```{r}
+
+umap_rec <- recipe(~., data = df) %>%
+  update_role(Sleep.Disorder, new_role = "id") %>%
+  step_dummy(all_nominal_predictors()) %>%  ###Así trabajarán las categóricas
+  step_normalize(all_predictors()) %>%
+  step_umap(all_predictors())
+```
+
+```{r}
+umap_res <- prep(umap_rec)
+umap_res
+```
+
+```{r}
+juice(umap_res) %>%
+  ggplot(aes(UMAP1, UMAP2)) +
+  geom_point(aes(color = Sleep.Disorder), size = 1.5)+
+  labs(color = NULL)
+
+```
+
+
+Ahora dejemos que UMAP juegue con los Hiperparámetros
+
+```{r}
+umap_params = expand.grid(n_neighbors = c(10, 20, 50, 100),min_dist = c(0.5, 0.75, 1.1))
+
+```
+
+```{r}
+umaps = lapply(seq(nrow(umap_params)), function(i) {
+    emb = umap(
+      X = df[,-1],
+      n_neighbors = umap_params$n_neighbors[i],
+      min_dist  = umap_params$min_dist[i])
+
+  return(emb)
+})
+```
+
+```{r}
+d = rbindlist(lapply(seq(nrow(umap_params)), function(i) {
+  data.table(
+    x = umaps[[i]][,1],
+    y = umaps[[i]][,2],
+    n_neighbors = umap_params$n_neighbors[i],
+    min_dist = umap_params$min_dist[i],
+    group = df$Sleep.Disorder
+  )
+}))
+```
+
+```{r}
+p<-ggplot(d) +
+  geom_scattermore(
+    mapping = aes(x = x, y = y,colour=group),
+    pointsize = 2
+  ) +
+  theme(
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title = element_blank(),
+    legend.position = "none"
+  ) +
+  facet_wrap(min_dist ~ n_neighbors ,
+             labeller = label_both,
+             scales = "free") +
+  theme_bw() +
+  labs(title = "WDBC: UMAP")
+
+p
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
