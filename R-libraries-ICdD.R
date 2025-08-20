@@ -1,59 +1,48 @@
-
-library(tidymodels)
+library(visdat) #Visualizador de los datos Faltantes
+library(uwot)
+library(tsne)
 library(tidyverse)
+library(tidytext)
+library(tidymodels)
+library(SmartEDA)
+library(skimr) #Para generar métricas
+library(scattermore)
+library(scales)
+library(Rtsne)
+library('rstatix')
+library(rgl)
+library(recipes)
+library(readr)
+library(psych)
+library(polycor)
+library(plotly)
+library(palmerpenguins) #Data Set de los pingüinos
+library(moments) #Calcular la Kurtosis y la Skewness
+library(modeldata)
+library(magrittr) #Operadores de Asignación
 library(knitr)
 library(kableExtra)
-library(GGally)
-library(psych)
-library(ggplot2)
-library(broom)
+library(janitor) #Para embellecer o limpiar los DF
 library(Hmisc)
-library(scales)
-library(recipes)
-library(rgl)
-library(plotly)
+library(hexbin) # Auxiliar para visualización
+library(ggplot2movies)
+library(ggplot2) #visualizaciones
+library(ggplot2)
 library(ggforce)
-library(tidytext)
+library(ggExtra) #visualizaciones
+library(gganimate)
+library(GGally)
+library(funModeling)
 library(FactoMineR)  
 library(factoextra)
+library(embed)
+library(dplyr) #Operaciones entre DataFrames
+library(dplyr)
+library(discrim)
+library(data.table)
+library(corrplot) #Visualizaciones de la matriz de correlación
+library(broom)
+library(baguette)
 #library(ggord)
 #library(autoplot)
 theme_set(theme_bw(16))
-library('rstatix')
-
-library(ggplot2) #visualizaciones
-library(ggExtra) #visualizaciones
-library(corrplot) #Visualizaciones de la matriz de correlación
-library(dplyr) #Operaciones entre DataFrames
-library(magrittr) #Operadores de Asignación
-library(palmerpenguins) #Data Set de los pingüinos
-library(visdat) #Visualizador de los datos Faltantes
-library(skimr) #Para generar métricas
-library(janitor) #Para embellecer o limpiar los DF
-library(moments) #Calcular la Kurtosis y la Skewness
-library(hexbin) # Auxiliar para visualización
-
-library(funModeling)
-library(SmartEDA)
-library(Hmisc)
-library(dplyr)
-library(ggplot2movies)
-
-library(embed)
-
-library(tidyverse)
-library(tidymodels)
-library(modeldata)
-library(embed)
-library(tsne)
-library(uwot)
-library(scattermore)
-library(readr)
-library(Rtsne)
-library(baguette)
-library(discrim)
-library(gganimate)
-library(data.table)
-
-library(polycor)
-library(tidyverse)
