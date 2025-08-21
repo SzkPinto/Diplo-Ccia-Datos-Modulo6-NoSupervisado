@@ -50,13 +50,13 @@ df<- read_csv("Sleep_health_and_lifestyle.csv") %>% data.frame()
 df |> dim()
 ```
 
-Si bien la documentación de la BDD menciona 400 observaciones, el documento tiene 374 y, 12 variables en lugar de 13, la adicional es el ID
+Si bien la documentación de la BDD menciona 400 observaciones, el documento tiene 374 y, 12 variables en lugar de 400 registros y 13 columnas, la adicional es el ID
 
 ```{r}
 df |>head(10)
 ```
 
-La variable Blood Preassure hay que ajustarla porque es una medida cuantitativa que se cargó como caracter. Hagamos la separación de los registros como Sistólica y Diastólica para incluirla de manera adecuada 
+La variable Blood Preassure hay que ajustarla porque es una medida cuantitativa que se cargó como carácter. Hagamos la separación de los registros como Sistólica y Diastólica para incluirla de manera adecuada
 
 ```{r}
 df <- df %>%
@@ -213,9 +213,6 @@ Complementemos la revisión de la estructura de Asociación con la matriz de cor
 # - stress_level (escala numérica, pero representa categorías ordenadas)
 # - bmi_category (tiene un orden lógico: Normal < Sobrepeso < Obeso)
 
-```{r}
-colnames(df)
-```
 
 
 ```{r}
@@ -267,6 +264,13 @@ correlation_matrix <- hetcor(vars_for_correlation)
 print("Matriz de Correlación (Policórica / Poliserial / Pearson):")
 print(correlation_matrix$correlations)
 
+```
+```{r}
+ggcorrplot::ggcorrplot(corr = correlation_matrix$correlations,
+                       type = "lower", 
+                       show.diag = TRUE,
+                       lab = TRUE, 
+                       lab_size = 3)
 ```
 
 3.7. Determinante de la Matriz
