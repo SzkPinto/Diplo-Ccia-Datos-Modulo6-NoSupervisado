@@ -332,7 +332,7 @@ base_recipe %>%
   ggplot(aes(x = component, y = value)) + 
   geom_col(fill = "#F25E52") + 
   xlim(c(0, 30)) + 
-  labs(x="PC", y="% acumulado de varianza", title="Scree plot")
+  labs(x="PC", y="% acumulado de varianza", title="Varianza Acumulada por Componente")
 ```
 
 ```{r}
@@ -416,7 +416,7 @@ juice(umap_res) %>%
 Ahora dejemos que UMAP juegue con los Hiperparámetros
 
 ```{r}
-umap_params = expand.grid(n_neighbors = c(10, 20, 50, 100),min_dist = c(0.5, 0.75, 1.1))
+umap_params = expand.grid(n_neighbors = c(10, 15, 20, 50, 100),min_dist = c(0.1, 0.5, 0.75, 1.1))
 
 ```
 
