@@ -24,37 +24,45 @@ Integrantes:
 # Métodos de Reducción de información
 
 ## 1. Introducción
+El creciente aumento en la cantidad de datos disponibles exige la optimización de los procesos de análisis, con el fin de reducir el consumo de tiempo, recursos computacionales y costos asociados. En este contexto, las técnicas de reducción de componentes representan una herramienta valiosa, ya que permiten simplificar la complejidad de la información al identificar y conservar las dimensiones más relevantes. De esta manera, se facilita la interpretación de los patrones subyacentes, se mejora la eficiencia de los modelos predictivos y se potencia la toma de decisiones fundamentadas.
 
 ## 2. Objetivo
+En este contexto, el presente proyecto tiene como objetivo principal aplicar tres técnicas de reducción de componentes —PCA, UMAP y t-SNE— sobre una misma base de datos, con el propósito de evaluar si es posible simplificar la información original sin perder los patrones más relevantes del conjunto de datos.
 
 ## 3. Contexto de la información
 
-El conjunto de datos sobre salud del sueño y estilo de vida consta de 400 filas y 13 columnas, que cubren una amplia gama de variables relacionadas con el sueño y los hábitos diarios.
+Nombre de la base de datos: Sleep_health_and_lifestyle.csv
+
+El conjunto de datos es un compendio de parámetros asociados con la calidad del sueño y estilo de vida de 400 personas. Consta por tanto de 400 filas y 13 columnas, representando estas últimas las variables a reducir. Partimos de un dataset de 13 componenentes, incluyendo la variable clasificatoria que en este caso en particular es "Sleep.Disorder" o Transtorno del sueño.
 
 ### Descripción de las variables
 
 - ID de Persona: Un identificador para cada individuo.
-- Género: El género de la persona (Hombre/Mujer).
-- Edad: La edad de la persona en años.
-- Ocupación: La ocupación o profesión de la persona.
-- Duración del Sueño (horas): El número de horas que la persona duerme al día.
-- Calidad del Sueño (escala: 1-10): Una calificación subjetiva de la calidad del sueño, del 1 al 10.
-- Nivel de Actividad Física (minutos/día): El número de minutos que la persona realiza actividad física diariamente.
-- Nivel de Estrés (escala: 1-10): Una calificación subjetiva del nivel de estrés que experimenta la persona, del 1 al 10.
-- Categoría de IMC: La categoría de IMC de la persona (p. ej., Bajo Peso, Normal, Sobrepeso).
-- Presión Arterial (Sistólica/Diastólica): La medición de la presión arterial de la persona, indicada como presión sistólica sobre presión diastólica. Frecuencia cardíaca (lpm): Frecuencia cardíaca en reposo de la persona    en latidos por minuto.
-- Pasos diarios: Número de pasos que da la persona al día.
-- Trastorno del sueño: Presencia o ausencia de un trastorno del sueño en la persona (ninguno, insomnio, apnea del sueño).
+- Género (Gender): El género de la persona (Hombre/Mujer).
+- Edad (Age): La edad de la persona en años.
+- Ocupación (Ocupation): La ocupación o profesión de la persona.
+- Duración del Sueño (Sleep Duration-horas): El número de horas que la persona duerme al día.
+- Calidad del Sueño (Quality of Sleep- escala: 1-10): Una calificación subjetiva de la calidad del sueño, del 1 al 10.
+- Nivel de Actividad Física (Physical Activity Level- minutos/día): El número de minutos que la persona realiza actividad física diariamente.
+- Nivel de Estrés (Stress Level- escala: 1-10): Una calificación subjetiva del nivel de estrés que experimenta la persona, del 1 al 10.
+- Categoría de IMC (BMI Category): La categoría de índice de masa corporal (IMC) de la persona (p. ej., Bajo Peso, Normal, Sobrepeso).
+- Presión Arterial (Blood Pressure- Sistólica/Diastólica): La medición de la presión arterial de la persona, indicada como presión sistólica sobre presión diastólica. Frecuencia cardíaca (lpm): Frecuencia cardíaca en reposo de la persona    en latidos por minuto.
+- Frecuencia cardiaca (Heart rate- lpm): número de veces que el corazón late por minuto.
+- Pasos diarios (Daily Steps): Número de pasos que da la persona al día.
+- Trastorno del sueño (Sleep Disorder): Presencia o ausencia de un trastorno del sueño en la persona (ninguno, insomnio, apnea del sueño).
+
+* Nota: El análisis utiliza los nombres en inglés.
 
 ### Details about Sleep Disorder Column:
 
-- None: The individual does not exhibit any specific sleep disorder.
-- Insomnia: The individual experiences difficulty falling asleep or staying asleep, leading to inadequate or poor-quality sleep.
-- Sleep Apnea: The individual suffers from pauses in breathing during sleep, resulting in disrupted sleep patterns and potential health risks.
+None: El individuo no presenta ningún trastorno específico del sueño.
+Insomnia: El individuo experimenta dificultad para conciliar o mantener el sueño, lo que conduce a un descanso inadecuado o de mala calidad.
+Sleep Apnea: El individuo sufre pausas en la respiración durante el sueño, lo que provoca patrones de sueño interrumpidos y posibles riesgos para la salud.
+
 
 ## 4. Desarrollo de Técnico
 
-Activiamos librerías
+Activamos librerías
 ```{r, warning=FALSE}
 source('R-libraries-ICdD.r')
 ```
@@ -69,7 +77,7 @@ df<- read_csv("Sleep_health_and_lifestyle.csv") %>% data.frame()
 df |> dim()
 ```
 
-Si bien la documentación de la BDD menciona 400 observaciones, el documento tiene 374 y, 12 variables en lugar de 400 registros y 13 columnas, la adicional es el ID
+Si bien la documentación de la base de datos (BDD) menciona 400 observaciones, el documento tiene 374 y, 12 variables en lugar de 400 registros y 13 columnas, la adicional es el ID
 
 ```{r}
 df |>head(10)
@@ -89,11 +97,11 @@ df |> head(10)
 df |> vis_dat()
 ```
 
-No encontramos datos pérdidos, por lo que en este sentido no hace falta pre procesamiento de datos adicional a las variables categoricas
+No se detectaron datos pérdidos, por lo que en este sentido no hace falta pre procesamiento de datos adicional a las variables categoricas
 
-La información no tiene datos pérdidos, pero si encontramos 5 columnas de tipo carácter, por lo que no es posible aplicar de manera directa la matriz de correlación y en consecuncia PCA, por lo que debemos pasar por un pre procesamiento de datos. En caso especial, la variable "Blood Pressure" es continua pero se cladifica como caracter, por lo que debemos separarla en dos columnas numéricas: sistólica y diastólica.
+Se encontraron cinco columnas de tipo caracter, por lo que no es posible aplicar de manera directa la matriz de correlación y en consecuncia PCA, por lo que debemos pasar por un pre procesamiento de datos. En caso especial, la variable "Blood Pressure" es continua pero se clasifica como caracter, por lo que debemos separarla en dos columnas numéricas: sistólica y diastólica.
 
-Nombramos a la variable "Sleep Disorder" como la variable de clasificación o respuesta de acuerdo al objetivo de la información
+Como se mencionó anteriormente tenemos a la variable "Sleep Disorder" como la variable de clasificación o respuesta de acuerdo al objetivo de la información.
 
 ```{r}
 df |> dlookr::diagnose()
@@ -173,7 +181,7 @@ df_long |> ggplot(mapping = aes(values, fill = Sleep.Disorder)) +
 ggpairs(df1, mapping = aes(color = Sleep.Disorder),columns = seq(1,8),progress = FALSE)
 ```
 
-Confirmemos si existe una estructura de Asociación entre las variables
+Se confirma enseguida si existe una estructura de Asociación entre las variables
 
 1. Valores de la Matriz de correlación (Correlación de Pearson)
 ```{r}
@@ -205,16 +213,16 @@ psych::cortest.bartlett(cor1_data,n=dim(df1)[1])
 
 ```
 
-##### Nuestra estrucura de Asociación solo con datos numéricos es mediana ya que:
+##### La estrucura de Asociación solo con datos numéricos es mediana ya que:
 
 1. La matriz de correlación no es tan cercano a 1 las antradas fuera de la diagonal
 2. El determinante aunque es pequeño (0.000008), no es cero
 3. El indicador KMO, está a la mitad de 1 (KMO=0.53)
 4. Se rechaza H0 de la prueba de Bartlett
 
-Por lo tanto, podemos decir que tiene una estrutura de asociación Mediana
+Por lo tanto, se puede afirmar que tiene una estrutura de asociación Mediana
 
-Complementemos la revisión de la estructura de Asociación con la matriz de correlación Policorica
+Se complementó la revisión de la estructura de Asociación con la matriz de correlación Policorica
 
 
 
@@ -223,7 +231,7 @@ Complementemos la revisión de la estructura de Asociación con la matriz de cor
 
 La correlación policórica requiere que las variables ordinales estén definidas como "ordered factors" en R.
 
- Identificamos las variables que son ordinales en tu dataset:
+ Se identificaron las variables que son ordinales en el dataset:
 - quality_of_sleep (escala numérica, pero representa categorías ordenadas)
 - stress_level (escala numérica, pero representa categorías ordenadas)
 - bmi_category (tiene un orden lógico: Normal < Sobrepeso < Obeso)
@@ -233,7 +241,7 @@ La correlación policórica requiere que las variables ordinales estén definida
 ```{r}
 df_prepared <- df %>%
   mutate(
-    # Convertimos las variables a factores ordenados
+    # Convertir las variables a factores ordenados
     quality_of_sleep_ord = factor(Quality.of.Sleep, ordered = TRUE),
     stress_level_ord = factor(Stress.Level, ordered = TRUE),
     # Para 'bmi_category', debemos especificar el orden correcto de los niveles
@@ -243,7 +251,7 @@ df_prepared <- df %>%
   )
 ```
 
-- Seleccionamos las variables ordinales que creamos y las numéricas relevantes para calcular la matriz de correlación mixta.
+- Se seleccionan las variables ordinales que creamos y las numéricas relevantes para calcular la matriz de correlación mixta.
 
 ```{r}
 vars_for_correlation <- df_prepared %>%
@@ -265,7 +273,7 @@ vars_for_correlation <- df_prepared %>%
 
 
 Cálculo de la matriz de correlación heterogénea
-La función hetcor() se encargará de todo automáticamente
+Se usó la función hetcor()
 
 ```{r}
 correlation_matrix <- hetcor(vars_for_correlation)
@@ -345,7 +353,7 @@ juice(umap_res) %>%
 ```
 
 
-Ahora dejemos que UMAP juegue con los Hiperparámetros
+Ahora se deja que UMAP juegue con los hiperparámetros
 
 ```{r}
 umap_params = expand.grid(n_neighbors = c(10, 20, 50, 100),min_dist = c(0.1, 0.5, 0.75, 1.1))
@@ -399,6 +407,7 @@ p
 ```
 
 #### Conclusiones UMAP
+
 
 
 
