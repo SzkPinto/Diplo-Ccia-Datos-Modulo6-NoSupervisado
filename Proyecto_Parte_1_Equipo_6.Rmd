@@ -14,7 +14,7 @@ header-includes: \usepackage[spanish]{babel}
 
 Integrantes:
 
-+ Morales González Susana  
++ Morales González Susan  
 + Pinto González Reyna Suzuky  
 + Reyes Román Eduardo  
 + Ruiz Jiménez Reynaldo David  
@@ -187,10 +187,46 @@ ggcorrplot::ggcorrplot(corr = cor1_data,
                        lab = TRUE, 
                        lab_size = 3)
 ```
+## Interpretación de la Matriz de Correlación
+
+A partir de la matriz de correlación (Spearman), se observan los siguientes hallazgos clave:
+
+- **Presión arterial sistólica y diastólica (r = 0.98)**  
+  Existe una correlación positiva muy fuerte, lo que indica que ambas medidas son prácticamente redundantes.
+
+- **Duración del sueño y calidad del sueño (r = 0.89)**  
+  A mayor número de horas de sueño, se reporta una mejor calidad del mismo.
+
+- **Calidad del sueño y nivel de estrés (r = -0.91)**  
+  Correlación negativa muy fuerte: cuando la calidad del sueño es alta, los niveles de estrés tienden a disminuir.
+
+- **Nivel de actividad física y pasos diarios (r = 0.79)**  
+  Una relación positiva clara: mayor número de pasos diarios implica un nivel de actividad física más alto.
+
+- **Calidad del sueño y frecuencia cardíaca (r = -0.73)**  
+  Mejor calidad de sueño se asocia con una frecuencia cardíaca más baja.
+
+
+- **Correlaciones débiles o nulas**  
+  Por ejemplo, entre **nivel de estrés y frecuencia cardíaca (r = 0.08)**, no se evidencia una relación clara.
+
+---
+
+En resumen, los resultados confirman relaciones esperadas entre variables de salud:  
+- El sueño influye directamente en el estrés y la frecuencia cardíaca.  
+- La actividad física está bien reflejada en los pasos diarios.  
+
+
 2. Determinante de la Matriz
 ```{r}
 det(cor1_data)
 ```
+## Interpretación : 
+Alta multicolinealidad
+
+Las variables están fuertemente correlacionadas entre sí.
+
+Ejemplos claros: presión sistólica ↔ presión diastólica (0.98), calidad del sueño ↔ duración del sueño (0.89).
 
 3. Indicador KMO (cercano a 1, relación fuerte entre las variables)
 
@@ -223,7 +259,7 @@ Complementemos la revisión de la estructura de Asociación con la matriz de cor
 
 La correlación policórica requiere que las variables ordinales estén definidas como "ordered factors" en R.
 
- Identificamos las variables que son ordinales en tu dataset:
+ Identificamos las variables que son ordinales en nuestos datos:
 - quality_of_sleep (escala numérica, pero representa categorías ordenadas)
 - stress_level (escala numérica, pero representa categorías ordenadas)
 - bmi_category (tiene un orden lógico: Normal < Sobrepeso < Obeso)
@@ -306,7 +342,20 @@ psych::cortest.bartlett(correlation_matrix$correlations,n=dim(df1)[1])
 
 #### Conclusiones / Recap del EDA
 
+El análisis de correlaciones revela patrones claros en la relación entre el sueño, el estrés, la actividad física y los indicadores de salud:
+
+- Existe una **relación negativa muy fuerte entre la calidad del sueño y el nivel de estrés (-0.92)**, lo que confirma la importancia del descanso adecuado en el bienestar psicológico.
+- La **duración del sueño se asocia positivamente con la calidad del sueño (0.89)** y negativamente con el estrés (-0.81), reforzando la idea de que dormir más horas contribuye a reducir la tensión emocional.
+- Se observa que **una mejor calidad de sueño se relaciona con una frecuencia cardíaca más baja (-0.66)**, mientras que niveles altos de estrés se vinculan con una frecuencia más elevada (0.67).
+- En cuanto a la actividad física, los **pasos diarios muestran una fuerte correlación con el nivel de actividad física (0.77)**, validando su uso como proxy de ejercicio.
+- En el ámbito demográfico, **la edad presenta correlación positiva con el IMC (0.47)** y con la calidad del sueño (0.52), pero negativa con el nivel de estrés (-0.52).
+
+En conjunto, estos resultados sugieren que la calidad y duración del sueño, junto con el manejo del estrés, son factores centrales en la salud general, mientras que los pasos diarios constituyen un buen indicador del nivel de actividad física. 
+El hallazgo de correlaciones muy altas entre ciertas variables (ej. presión arterial sistólica/diastólica o duración/calidad del sueño) indica la existencia de multicolinealidad, lo que deberá considerarse en los modelos posteriores.
+
+
 ### 4.2 Definir la "receta" de preprocesamiento con tidymodels
+
 
 ```{r}
 base_recipe <-
@@ -330,6 +379,8 @@ umap_rec <- recipe(~., data = df) %>%
   step_umap(all_predictors())
 ```
 
+
+
 ```{r}
 umap_res <- prep(umap_rec)
 umap_res
@@ -343,20 +394,35 @@ juice(umap_res) %>%
   labs(color = NULL)
 
 ```
+##Interpretación
+
+El gráfico UMAP muestra que sí existen patrones latentes en los datos (sobre todo para distinguir a quienes no tienen trastorno), pero la frontera entre insomnio y apnea no es nítida, lo cual refleja la complejidad clínica del problema.
 
 
-Ahora dejemos que UMAP juegue con los Hiperparámetros
 
 ```{r}
 umap_params = expand.grid(n_neighbors = c(10, 20, 50, 100),min_dist = c(0.1, 0.5, 0.75, 1.1))
 ```
 
+## Se evaluaron distintas combinaciones de parámetros principales de UMAP:
+
+- n_neighbors (vecinos): controla cuánto peso tienen las relaciones locales vs. globales.
+
+  Valores bajos (10–20): más énfasis en la estructura local → aparecen subgrupos pequeños.
+
+  Valores altos (50–100): se prioriza la estructura global → clusters grandes pero menos definidos.
+
+- min_dist: controla cuán apretados o dispersos se muestran los clusters.
+
+  Valores bajos (0.1–0.5): puntos más compactos → se distinguen mejor subgrupos.
+
+  Valores altos (0.75–1.1): los puntos se dispersan → menor definición de clusters.
 
 ```{r}
 set.seed(123) 
 umaps = lapply(seq(nrow(umap_params)), function(i) {
     emb = umap(
-      X = df[,-13], #Acpa quito la variable respuesta, es decir los Slepp Disorder porque ocupa el lugar 13 en el df
+      X = df[,-13], #Aca quitamos la variable respuesta, es decir los Slepp Disorder porque ocupa el lugar 13 en el df
       n_neighbors = umap_params$n_neighbors[i],
       min_dist  = umap_params$min_dist[i])
 
@@ -364,6 +430,15 @@ umaps = lapply(seq(nrow(umap_params)), function(i) {
 })
 
 ```
+
+- min_dist bajo (0.1–0.5) + pocos vecinos (10–20):
+Se ven varios microgrupos → el cluster de “None” aparece más diferenciado, aunque Insomnia y Apnea se dispersan.
+
+- n_neighbors intermedio (20–50) + min_dist=0.5:
+Ofrece el mejor balance: los sujetos “None” (verde) tienden a agruparse en masa, mientras que Insomnia (rojo) y Apnea (azul) se intercalan pero con cierta separación periférica.
+
+- n_neighbors muy alto (100) o min_dist grande (0.75–1.1):
+Los clusters se diluyen → la estructura se aplana y los tres grupos se mezclan más, perdiendo capacidad de distinguir patrones.
 
 ```{r}
 d = rbindlist(lapply(seq(nrow(umap_params)), function(i) {
@@ -377,6 +452,21 @@ d = rbindlist(lapply(seq(nrow(umap_params)), function(i) {
 }))
 ```
 
+De acuerdo con las visualizaciones:
+
+Configuración óptima para este dataset:
+
+n_neighbors = 20–50
+
+min_dist = 0.5
+
+Justificación:
+
+Mantiene la coherencia global sin perder detalle local.
+
+Permite observar que “None” forma un cluster más cohesivo.
+
+Muestra que Insomnia y Sleep Apnea tienden a superponerse, lo cual es realista clínicamente, pero aún así se logran ver diferencias en la periferia.
 ```{r}
 p<-ggplot(d) +
   geom_scattermore(
@@ -399,6 +489,15 @@ p
 ```
 
 #### Conclusiones UMAP
+
+UMAP confirma que:
+
+Existe un patrón claro en personas sin trastorno (grupo más compacto).
+
+Insomnia y Apnea no tienen una frontera bien definida (se mezclan), lo que refleja la complejidad real del fenómeno.
+
+Ajustar los hiperparámetros es clave para resaltar estas diferencias.
+
 
 
 
