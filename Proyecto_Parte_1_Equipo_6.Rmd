@@ -2,8 +2,21 @@
 title: "Proyecto Modulo 6, parte 1"
 author: "Equipo 6"
 date: "2025-08-10"
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: readable
+    highlight: tango
+    df_print: paged
+header-includes: \usepackage[spanish]{babel}
 ---
+
+Integrantes:
+
++ Vital Arana José Andrés de Jesús
++ Zetina Rosas Enya
++ Reyes Román Eduardo
 
 # Métodos de Reducción de información
 
@@ -39,7 +52,7 @@ El conjunto de datos sobre salud del sueño y estilo de vida consta de 400 filas
 ## 4. Desarrollo de Técnico
 
 Activiamos librerías
-```{r}
+```{r, warning=FALSE}
 source('R-libraries-ICdD.r')
 ```
 
@@ -383,6 +396,7 @@ p
 ```
 
 #### Conclusiones UMAP
+
 
 
 
