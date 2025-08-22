@@ -14,9 +14,12 @@ header-includes: \usepackage[spanish]{babel}
 
 Integrantes:
 
-+ Vital Arana José Andrés de Jesús
-+ Zetina Rosas Enya
-+ Reyes Román Eduardo
++ Morales González Susana  
++ Pinto González Reyna Suzuky  
++ Reyes Román Eduardo  
++ Ruiz Jiménez Reynaldo David  
++ Vital Arana José Andrés de Jesús  
++ Zetina Rosas Enya  
 
 # Métodos de Reducción de información
 
@@ -396,6 +399,7 @@ p
 ```
 
 #### Conclusiones UMAP
+
 
 
 
