@@ -467,6 +467,7 @@ Mantiene la coherencia global sin perder detalle local.
 Permite observar que “None” forma un cluster más cohesivo.
 
 Muestra que Insomnia y Sleep Apnea tienden a superponerse, lo cual es realista clínicamente, pero aún así se logran ver diferencias en la periferia.
+
 ```{r}
 p<-ggplot(d) +
   geom_scattermore(
@@ -497,6 +498,8 @@ Existe un patrón claro en personas sin trastorno (grupo más compacto).
 Insomnia y Apnea no tienen una frontera bien definida (se mezclan), lo que refleja la complejidad real del fenómeno.
 
 Ajustar los hiperparámetros es clave para resaltar estas diferencias.
+
+### Falta la conclusion final
 
 
 
