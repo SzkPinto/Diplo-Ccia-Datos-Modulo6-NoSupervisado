@@ -764,6 +764,11 @@ ggplot(df_tsne, aes(x=Dim1, y=Dim2, color=Sleep.Disorder)) +
        subtitle="Perplexity=30, eta=200, iter=1000")
 ```
 
+Aquí se observa una separación clara entre los individuos con Sleep Apnea (azules) frente a los demás. Están agrupados en un clúster bastante definido hacia la derecha.
+Los casos con None (verde) tienden a dispersarse en varios subgrupos, algunos bien compactos y otros más mezclados con los de Insomnia, por otro lado los de Insomnia (rojo) aparecen intercalados con los de None, lo que indica que estas dos clases pueden compartir características similares.
+
+t-SNE logra encontrar patrones claros para Sleep Apnea, pero no tanto entre Insomnia y None, que parecen solaparse.
+
 Con el fin de encontrar los parámetros que muestren la mejor reducción de funcionalidad se genera una rejilla con distintos valores de perplexity.
 
 ```{r}
@@ -811,6 +816,11 @@ p1 <- ggplot(d1) +
  theme_minimal()
 p1
 ```
+En este grafico vemos lo siguiente en estos rangos
+Perplexity 10–15: El embedding genera estructuras muy fragmentadas, con clústeres más pequeños pero menos estables.
+Perplexity 25–30: Se logra un mejor balance, donde se distingue bastante bien el grupo azul (Sleep Apnea) y se mantienen agrupamientos más consistentes en los verdes (None).
+Perplexity 50: Se observa un "aplanamiento" de los grupos; los clústeres pierden definición y se dispersan más.
+En general podemos decir que valores intermedios de perplexity (25–30) parecen dar representaciones más útiles y coherentes. Muy bajos (10) generan demasiado ruido, y muy altos (50) diluyen las separaciones.
 
 Ahora la rejilla se genera variando los valores tanto de perplexity y eta.
 
@@ -859,10 +869,9 @@ p2 <- ggplot(d2) +
 p2
 ```
 
-De acuerdo a los valores que se usaron para perplexity y eta, se concluye que aquellos que muestran una mejor reducción de dimensiones son:
-
-*
-*
+*El dataset tiene patrones detectables: Sleep Apnea se distingue bien, mientras que Insomnia y None muestran solapamiento, lo que sugiere similitud en sus variables.
+*El preprocesamiento con recipe (centrar, escalar, dummies) ayudó a que el embedding sea más estable.
+*Los parámetros óptimos para este caso parecen ser perplexity 25–30 y eta=200.
 
 
 
