@@ -1,0 +1,567 @@
+---
+title: "Untitled"
+author: "Andres"
+date: "2025-08-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+  ## Análisis de PCA para el conjunto de datos: Sleep_health_and_lifestyle
+  # El objetivo de la técnica es la reducción de dimensiones
+  
+  
+
+  ###Librerias
+```{r}
+rm(list = ls())  
+library(tidymodels) #batallé para instalarlo
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(GGally)
+library(psych)
+library(ggplot2)
+library(broom)
+library(Hmisc)
+library(psych)
+library(scales)
+library(ggfortify)
+#library(autoplot) #reemplazar por ggfortify
+library(recipes)
+library(rgl)
+library(plotly)
+library(ggforce)
+library(tidytext)
+library(FactoMineR)  
+library(factoextra)
+library(ggord) # instalar desde github
+
+#para paquetes que dieron problema usar las siguientes ligas:
+#install.packages("devtools")   
+#devtools::install_github("fawda123/ggord")
+#install.packages("rlang", dependencies = TRUE)
+#install.packages("tidymodels", dependencies = TRUE)
+```
+
+
+# Cargamos la base de datos
+
+```{r}
+data<-read.csv("C:/Users/andre/OneDrive/Documentos/Diplo-Ccia-Datos-Modulo6-NoSupervisado/Sleep_health_and_lifestyle.csv")
+
+# Iniciaremos con varios pasos previos al PCA donde exploramos la base de datos
+str(data)
+```
+
+
+
+```{r}
+data %>% head()
+```
+
+
+```{r}
+# Valores faltantes
+colSums(is.na(data))
+```
+
+```{r}
+# Descriptiva básica de los traits
+data %>% summary()
+```
+
+```{r}
+ # descriptiva en una tabla
+num.dat = data %>% select_if(is.numeric)
+apply(num.dat,2,function(x) round(summary(x),3)) %>% 
+  kbl() %>%
+  kable_styling(bootstrap_options = c("striped","hover","bordered")) %>% 
+  kable_paper() %>%
+  scroll_box(width = "100%", height = "320px")  #GENERA TABLA CON LAS MEDIDAS DESCRIPTIVAS
+```
+
+
+```{r}
+
+# lo agregué aparte porque no lo jaló en el primer bloque de librerias
+library(kableExtra)
+
+# convertir Sleep.Disorder a factor
+data$Sleep.Disorder<- as.factor(data$Sleep.Disorder)
+
+glimpse(data)
+#Graficamos frecuencias absolutas y relativas para la variable Sleep.Disorder
+```
+
+
+
+```{r}
+# Graficar con columnas el conteo de diagnostigos bueno vs malos.  conteo|%
+data %>%
+  group_by(Sleep.Disorder) %>%
+  summarise (n = n()) %>%
+  mutate(prop = n / sum(n)) %>%
+  ggplot(aes(data,x = Sleep.Disorder, y = n)) +
+  geom_col(fill = c("#CC0033", "#e319dc", "green")) +
+  geom_text(aes(label = paste0(n, " | ", signif(n / nrow(data) * 100, digits = 4), '%')), nudge_y = 10) + ggtitle("Porcentajes de Sleep.Disorder") +
+  theme_gray()
+```
+
+
+
+```{r}
+###Histogramas para las variables numericas
+data1 <- data |> dplyr::select(where(is.numeric))
+data1 |> pivot_longer(1:ncol(data1), 
+                      names_to = "Variable", values_to="Score") |>
+  ggplot(aes(x=Score)) + geom_histogram(aes(y = ..density..),bins=20,colour = 3, fill = "darkmagenta") +
+  facet_wrap("Variable",ncol = 4,scales = "free" ) + theme_minimal()
+
+```
+
+###box-plot para VISUALIZAR LAS VAR PREDICTORAS: explorando y entendiendolas pero no importa normalidad, 
+#simetria, outliers
+
+
+```{r}
+data1 |> pivot_longer(1:ncol(data1), 
+                      values_to="Score",names_to = "Variable") |>
+  ggplot(aes(y=Score)) + geom_boxplot(aes(fill="darkred"),colour = 3,show.legend = FALSE) +
+  facet_wrap("Variable",ncol = 4,scales = "free" ) + theme_minimal()
+
+```
+
+###graficos de Densidad
+
+
+```{r}
+data1 |> pivot_longer(1:ncol(data1), 
+                      names_to = "Variable",values_to="Score") |>
+  ggplot(aes(x=Score)) + geom_density(aes(fill="darkred"),colour = 3,show.legend = FALSE) +
+  facet_wrap("Variable",ncol = 4,scales = "free" ) + theme_minimal()
+```
+
+
+#Comparamos por categoria de Sleep.Disorder
+# Separamos los boxplot por tipo de Sleep.Disorder
+
+
+```{r}
+# Crear variables dummy (excluyendo Sleep.Disorder) antes de graficar
+data_dummies <- data %>%
+  select(-Sleep.Disorder) %>%
+  mutate(across(where(is.character), as.factor)) %>%
+  model.matrix(~ . - 1, data = .) %>%
+  as.data.frame()
+```
+
+```{r}
+# Añadir Sleep.Disorder de nuevo
+data_ready <- bind_cols(Sleep.Disorder = data$Sleep.Disorder, data_dummies)
+
+data_long <- data_ready %>%
+  pivot_longer(cols = -Sleep.Disorder, names_to = "variable", values_to = "value")
+
+ggplot(data_long, aes(x = Sleep.Disorder, y = value)) +
+  geom_boxplot() +
+  facet_wrap(~ variable, scales = "free", ncol = 3) +
+  theme_minimal() +
+  labs(title = "Boxplots de variables numéricas y dummies por trastorno del sueño",
+       x = "Sleep Disorder",
+       y = "Valor")
+
+```
+  # Aqui visualizamos que variables muestran constraste entre los 3 tipos de Sleep.disorder
+  # Y que por lo tanto podrían ser más utiles en el PCA
+
+
+
+```{r}
+# Comparamos las densidades para cada categoría de Sleep.Disorder
+data_long |> ggplot(mapping = aes(value, fill = Sleep.Disorder)) +
+  geom_density(color = "white") +
+  facet_wrap(~variable, scales = "free", ncol= 4) +
+  scale_color_viridis_d(option = "plasma", end = .7) +
+  labs(title = "Variables Distribution") +
+  theme_light()+
+  labs(title = "Comparación a través de densidad")
+```
+
+  # Aqui nuevamente observamos variables poco informativas como Ocupation: Doctor, donde todas
+  # los grupos de Sleep.disorder se ven igual
+  # Los contrastes interesantes se muestran en las var edad, Blood.preasure_d2 y s1, Daily.steps,Heart.rate,
+    #physical activity, stress.level, Sleep.duration y quality of sleep
+
+# Gráfico de correlaciones entre variables
+# Se busca tener variables correlacionadas para mejor desempeño del PCA
+  #si no hay correlaciones entre variables, el PCA no reducirá mucho la dimensionalidad.
+
+
+```{r}
+#install.packages("GGally")
+library(GGally)
+
+# Se observa que la correlación entre las variables es baja
+
+## grafico de corr + valores de p para todas las variables
+ggpairs(data_ready, mapping = aes(color = Sleep.Disorder),columns = seq(2,11))
+
+# Explorareamos ahora la correlación entre variables numéricas solamente
+# observamos 
+```
+
+```{r}
+cor_data <- cor(num.dat) #num.dat contiene solo las var numericas
+cor_data
+```
+
+
+
+```{r}
+# Exploramos las correlaciones Spearman y vemos resultados similares a las cor de Pearson
+cor1_data<-cor(num.dat[,],method="spearman")
+ggcorrplot::ggcorrplot(corr = cor1_data,
+                       type = "lower", 
+                       show.diag = TRUE,
+                       lab = TRUE, 
+                       lab_size = 3)
+
+
+```
+# Nuevamente observamos bajas correlaciones entre algunas de las variables numéricas, por ejemplo
+# entre Heart Rate y Age (r=-0.225). Y algunas altas como entre Stress.Level y Quality.of.Sleep (-0.91)
+
+
+
+
+
+```{r}
+det(cor1_data)  #valores cercano a 0, hacen una estrctura de asociación fuerte (DESEABLE)
+  # en este caso, si, se tiene
+```
+
+# Exploramos otra opción, quizá mas adecuada para el conjunto de datos mixto
+# donde tenemos tanto variables categóricas como numéricas
+# Instalar y cargar paquete
+
+
+```{r}
+#install.packages("polycor")
+library(polycor)
+
+# hetcor() calcula la matriz de correlaciones mixtas . Esta muestra correlaciones con var categóricas y numéricas
+# Pearson para numéricas, policórica para ordinales
+data_noSleep <- data[ , -13]  #eliminamos la variable de clasificación del dataframe original (sin dummies)
+cor_matrix <- hetcor(data_noSleep)  
+
+# La matriz MIXTA (policoricas y paersoN) final de correlaciones
+cor_matrix$correlations
+
+ # visuzalizamos las correlaciones MIXTAS en un gráfico heatmap
+
+
+# Convertir la matriz en formato largo para ggplot
+```
+
+```{r}
+library(reshape2)
+# Extraer la matriz de correlaciones del objeto hetcor
+cor_mat <- cor_matrix$correlations
+
+# Convertir a formato largo
+cor_long <- melt(cor_mat)
+colnames(cor_long) <- c("Variable1", "Variable2", "Correlation")
+
+# Crear el heatmap con valores en las celdas
+ggplot(cor_long, aes(x = Variable1, y = Variable2, fill = Correlation)) +
+    geom_tile(color = "white") +  # Cada celda como cuadrado
+    geom_text(aes(label = round(Correlation, 2)), color = "black", size = 3) +  # Mostrar valores
+    scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+    theme_minimal(base_size = 14) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    labs(title = "Heatmap de Correlaciones Mixtas",
+         fill = "Correlación")
+```
+
+
+# Mediante los análálisis de correlación pudimos detectar que hay variables muy correlacionadas
+# que prácticamente estrían aportando la misma información al PCA. Se puede optar por eliminar una de ellas
+# para evitar sobreestimar la relevancia de las mismas, O promediarlas. Usaremos la primera opción.
+# Var muy correlacionadas (definimos punto de corte en >=.085): 
+        # Quality.of.Sleep y Sleep.Duration (r=0.88)
+        # Blood.Pressure_S1 y Blood.Pressure_d2 (r=0.97)
+        # Quality.of.Sleep y Stress.Level (r=-0.9)
+        
+# Nos quedaremos solamente con una de cada par, para el PCA
+
+
+
+
+
+
+## Iniciamos con el PCA
+# Procesamos las categóricas con el siguiente código
+# donde se convierten a dimmies
+
+
+```{r}
+
+data_forPCA <- data[, !(names(data) %in% c("Blood.Pressure_d2", "Quality.of.Sleep"))]
+
+library(recipes)
+base_recipe <- 
+  recipe(Sleep.Disorder ~ ., data = data_forPCA) %>%
+  step_dummy(all_nominal_predictors()) %>%      # Variables categóricas a dummies
+  step_normalize(all_numeric_predictors()) %>%  # Escalar/normalizar y centrar numéricas
+  step_pca(all_numeric_predictors(), id = "pca") # PCA sobre las numéricas
+
+# Preparar la receta
+base_prep <- prep(base_recipe)
+```
+
+
+```{r}
+# Extraer información de PCA
+base_pca <- 
+  base_prep %>% 
+  tidy(id = "pca")
+
+# Mostrar tabla con la carga de cada componente
+print(base_pca)
+
+```
+   # Aqui observamos que los traits que mas contribuyen al PC1 son edad y Gender_Male
+
+
+
+```{r}
+# Graficos de varianza explicada por cada componente
+base_prep %>% 
+  tidy(id = "pca", type = "variance") %>% 
+  filter(terms == "percent variance") %>% 
+  ggplot(aes(x = component, y = value)) + 
+  geom_col(fill = "#B53389") + 
+  xlim(c(0, 30)) + 
+  labs(x = "PC", y = "% de varianza", title = "Scree plot")
+
+```
+        # Observamos que son 3 componentes los que aportan mas del 10% de varianza cada uno
+
+
+```{r}
+# Gráfico de % acumulado de varianza explicada
+base_prep %>% 
+  tidy(id = "pca", type = "variance") %>% 
+  filter(terms == "cumulative percent variance") %>% 
+  ggplot(aes(x = component, y = value)) + 
+  geom_col(fill = "#F25E52") + 
+  xlim(c(0, 30)) + 
+  labs(x = "PC", y = "% acumulado de varianza", title = "Scree plot acumulado")
+
+```
+        # el gráfico muestra que se necesitan 8 PC para explicar >75% de la varianza total
+
+# #graficos de barras horizontales, desplegando la contribución positiva o negativa
+
+
+```{r}
+# de las var a cada uno de los componentes
+base_pca %>%
+  mutate(terms = tidytext::reorder_within(terms, 
+                                          abs(value), 
+                                          component)) %>%
+  ggplot(aes(abs(value), terms, fill = value > 0)) +
+  geom_col() +
+  facet_wrap(~component, scales = "free_y") +
+  tidytext::scale_y_reordered() +
+  scale_fill_manual(values = c("#b6dfe2", "#0A537D")) +
+  labs(
+    x = "Absolute value of contribution",
+    y = NULL, fill = "¿Positive?"
+  ) +
+    theme(axis.text.y = element_text(size = 4))  # Ajusta el tamaño de letra del eje y
+```
+
+
+```{r}
+
+# Mejorar la visualización reduciendo el número de componentes mostrados
+        library(forcats)
+base_pca %>%
+  filter(component %in% paste0("PC", 1:6)) %>%  #desplegar solo los 6 primeros componentes
+  mutate(component = fct_inorder(component)) %>%
+  ggplot(aes(value, terms, fill = terms)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~component, nrow = 1) +
+  labs(y = NULL)
+```
+# Observamos nuevamente que Age es la variable que contribuye mas al PC1 y 
+# Stress level junto con Heart_rate son los que mas contribuyen al PC2
+# De la misma forma podemos explorar la contribución de las traits a los compontentes 3.4.5.6
+
+
+### Grafico de puntos coloreando en base a la categoría de Sleep.Disorder
+# Extraer PCA
+
+
+```{r}
+pca_scores <- juice(base_prep)
+head(pca_scores)  # Visualizamos
+pca_scores$Sleep.Disorder <- data$Sleep.Disorder #añadimos la var Sleep.Disorder porque la habiamos eliminado apra hacer el PCA
+     #grafica
+ggplot(pca_scores, aes(x = PC1, y = PC2, label = Sleep.Disorder)) +
+  geom_point(aes(color = Sleep.Disorder), alpha = 0.7, size = 2) +
+    labs(color = NULL,
+       title = "PCA de variables con Sleep.Disorder") +
+  theme_minimal()
+
+###3D
+```
+
+
+```{r}
+# Colores para rgl
+mycolors <- rainbow(length(unique(pca_scores$Sleep.Disorder)))
+pca_scores$color <- mycolors[as.numeric(pca_scores$Sleep.Disorder)]
+
+# Gráfico 3D con rgl
+plot3d(
+    x = pca_scores$PC1,
+    y = pca_scores$PC2,
+    z = pca_scores$PC3,
+    col = pca_scores$color,
+    type = 's',
+    radius = 0.1,
+    xlab = "PC1",
+    ylab = "PC2",
+    zlab = "PC3"
+)
+
+```
+
+
+
+```{r}
+library(plotly)
+library(rgl)
+# Gráfico interactivo 3D con plotly
+g.df1 <- plot_ly(
+    pca_scores, 
+    x = ~PC1, 
+    y = ~PC2, 
+    z = ~PC3, 
+    color = ~Sleep.Disorder, 
+    colors = rainbow(length(unique(pca_scores$Sleep.Disorder)))  # colores automáticos
+) %>%
+    add_markers() %>%
+    layout(scene = list(
+        xaxis = list(title = 'PC1'),
+        yaxis = list(title = 'PC2'),
+        zaxis = list(title = 'PC3')
+    ))
+
+g.df1
+   # otra forma de hacer el mismo gráfico
+  # pero mas complicada :(
+```
+
+```{r}
+df1 <- pca_scores
+    #convertir en caracter los Sleep.Disorder, porque como factores no los reconoce
+df1 <- df1 %>%
+    mutate(Sleep.Disorder = as.character(Sleep.Disorder))
+```
+
+```{r}
+ 
+#Hacemos subsets por categoria de Sleep.Disorder
+df1$Sleep.Disorder[df1$Sleep.Disorder == "None"] <- "N"
+df1$Sleep.Disorder[df1$Sleep.Disorder == "Insomnia"] <- "I"
+df1$Sleep.Disorder[df1$Sleep.Disorder == "Sleep Apnea"] <- "A"
+df1$Sleep.Disorder <- as.factor(df1$Sleep.Disorder)
+
+table(df1$Sleep.Disorder)
+```
+
+
+```{r}
+fig <- plot_ly(df1, x = ~PC1, y = ~PC2, z = ~PC3, color = ~Sleep.Disorder, colors = c('#BF382A', '#0C4B8E', "green"))
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'PC1'),
+                                   yaxis = list(title = 'PC2'),
+                                   zaxis = list(title = 'PC3')))
+
+fig
+
+```
+
+# Aqui voy!!! Falta trabajar mas esta sección
+######################### Graficos biplots y demás
+### Para ello necesitamos usar esta metodología para el PCA
+###PCA
+
+
+
+```{r}
+pca_fit <- data_forPCA %>%
+    select(where(is.numeric)) %>%
+    scale() %>%
+    prcomp()
+
+
+
+```
+
+```{r}
+
+library(factoextra)
+library(ggord)  # solo si quieres usar ggord
+#  Biplot de variables
+fviz_pca_var(pca_fit,,
+             alpha.var = "contrib",
+             col.var = "contrib", 
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             title = 'Influencia de las variables en PCA1 y PCA2',
+             repel = TRUE)
+```
+
+
+```{r}
+#  Distribución de los individuos (coloreados por contribución)
+fviz_pca_ind(pca_fit,,
+             col.ind = "contrib", 
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             title='Distribución de los individuos en PCA1 y PCA2',
+             repel = TRUE)
+```
+
+
+```{r}
+#  Biplot general (variables en azul, individuos en gris)
+fviz_pca_biplot(pca_fit,, repel = TRUE,
+                title='Biplot',
+                col.var = "#2E9FDF",
+                col.ind = "#696969")
+```
+
+
+```{r}
+# 4️⃣ Gráfico tipo ggord coloreando individuos por Sleep.Disorder
+ggord(res.pca, df1$Sleep.Disorder)
+```
+
+```{r}
+
+#  Biplot con colores por Sleep.Disorder y elipses de confianza
+fviz_pca_biplot(pca_fit, repel = TRUE,
+                col.var = "blue", 
+                col.ind = df1$Sleep.Disorder, 
+                palette = c("#BF382A", "#0C4B8E", "green"),
+                addEllipses = TRUE, 
+                ellipse.level = 0.95,
+                title = "Biplot PCA con Sleep.Disorder")
+
+```
