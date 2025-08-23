@@ -59,6 +59,31 @@ None: El individuo no presenta ningún trastorno específico del sueño.
 Insomnia: El individuo experimenta dificultad para conciliar o mantener el sueño, lo que conduce a un descanso inadecuado o de mala calidad.
 Sleep Apnea: El individuo sufre pausas en la respiración durante el sueño, lo que provoca patrones de sueño interrumpidos y posibles riesgos para la salud.
 
+```{r}
+library(tidymodels)
+library(tidyverse)
+library(data.table)
+library(scattermore)
+library(gganimate)
+library(caret) 
+library(knitr)
+library(kableExtra)
+library(GGally)
+library(psych)
+library(ggplot2)
+library(broom)
+library(Hmisc)
+library(scales)
+library(recipes)
+library(rgl)
+library(plotly)
+library(ggforce)
+library(tidytext)
+library(FactoMineR)  
+library(factoextra)
+library(Rtsne)
+theme_set(theme_bw(16))
+```
 
 ## 4. Desarrollo de Técnico
 
@@ -378,7 +403,7 @@ base_recipe <-
 ### 4.2.1 Modelo de PCA
 
 ```{r}
-data<-read.csv("C:/Users/andre/OneDrive/Documentos/Diplo-Ccia-Datos-Modulo6-NoSupervisado/Sleep_health_and_lifestyle.csv")
+data<-read.csv("Sleep_health_and_lifestyle.csv")
 
 
 data_forPCA <- data[, !(names(data) %in% c("Blood.Pressure_d2", "Quality.of.Sleep"))]
@@ -686,6 +711,161 @@ fviz_pca_biplot(pca_fit,
 
 
 ### 4.2.2 Modelo de tSNE
+
+Se genera recipe para procesar las variables categóricas, se escalan y se centran los datos.
+
+```{r}
+rec <- recipe(~ ., data = df) %>%
+  step_rm(Sleep.Disorder) %>%                # quitar target
+  step_dummy(all_nominal_predictors()) %>%   # procesamiento variables categóricas
+  step_center(all_numeric_predictors()) %>%  # centrar
+  step_scale(all_numeric_predictors())       # escalar
+
+```
+
+Se preparan los features y se define la variable objetivo Sleep.Disorder
+
+```{r}
+#Preparación con recipe
+prep_rec <- prep(rec)
+features_processed <- bake(prep_rec, new_data = NULL)
+```
+
+```{r}
+objetivo <- df$Sleep.Disorder
+objetivo
+```
+
+Se aplica el algoritmo Rtsne con valores fijos de perplexity, eta y max_iter y se visualiza la formación de grupos bajo estos parámetros.
+
+```{r}
+#TSNE
+set.seed(123)
+tsne_res <- Rtsne(
+  X = as.matrix(features_processed),
+  perplexity = 30,
+  eta = 200,
+  max_iter = 1000,
+  check_duplicates = FALSE,
+  verbose = TRUE
+)
+
+df_tsne <- data.frame(
+  Dim1 = tsne_res$Y[,1],
+  Dim2 = tsne_res$Y[,2],
+  Sleep.Disorder = objetivo
+)
+
+# VISUALIZAR
+ggplot(df_tsne, aes(x=Dim1, y=Dim2, color=Sleep.Disorder)) +
+  geom_point(size=1.5, alpha=0.7) +
+  theme_minimal() +
+  labs(title="t-SNE con recipe (Sleep dataset)",
+       subtitle="Perplexity=30, eta=200, iter=1000")
+```
+
+Con el fin de encontrar los parámetros que muestren la mejor reducción de funcionalidad se genera una rejilla con distintos valores de perplexity.
+
+```{r}
+library(tidyverse)
+library(Rtsne)
+library(ggplot2)
+library(data.table)
+library(scattermore)
+library(gganimate)
+library(caret) 
+
+
+
+set.seed(123)
+tsne_params <- expand.grid(perplexity = c(10, 15, 25, 30, 50))
+tsne_res <- lapply(seq(nrow(tsne_params)), function(i) {
+ Rtsne(
+   X = as.matrix(features_processed),
+   max_iter = 500,
+   perplexity = tsne_params$perplexity[i],
+   check_duplicates = FALSE,
+   verbose = FALSE
+ )
+})
+d1 <- rbindlist(lapply(seq(nrow(tsne_params)), function(i) {
+ data.table(
+   x = tsne_res[[i]]$Y[,1],
+   y = tsne_res[[i]]$Y[,2],
+   perplexity = tsne_params$perplexity[i],
+   group = df$Sleep.Disorder
+ )
+}))
+p1 <- ggplot(d1) +
+ geom_scattermore(
+   mapping = aes(x = x, y = y, colour = group),
+   pointsize = 2
+ ) +
+ theme(
+   axis.text = element_blank(),
+   axis.ticks = element_blank(),
+   axis.title = element_blank(),
+   legend.position = "none"
+ ) +
+ facet_wrap("perplexity", labeller = label_both, scales = "free") +
+ theme_minimal()
+p1
+```
+
+Ahora la rejilla se genera variando los valores tanto de perplexity y eta.
+
+```{r}
+set.seed(123)
+tsne_params2 <- expand.grid(
+ perplexity = c(10, 20, 30),
+ eta = c(50, 100, 200)
+)
+tsne_res2 <- lapply(seq(nrow(tsne_params2)), function(i) {
+ Rtsne(
+   X = as.matrix(features_processed),
+   max_iter = 500,
+   perplexity = tsne_params2$perplexity[i],
+   eta = tsne_params2$eta[i],
+   check_duplicates = FALSE,
+   verbose = FALSE,
+   pca = FALSE
+ )
+})
+d2 <- rbindlist(lapply(seq(nrow(tsne_params2)), function(i) {
+ data.table(
+   x = tsne_res2[[i]]$Y[,1],
+   y = tsne_res2[[i]]$Y[,2],
+   perplexity = tsne_params2$perplexity[i],
+   eta = tsne_params2$eta[i],
+   group = df$Sleep.Disorder
+ )
+}))
+p2 <- ggplot(d2) +
+ geom_scattermore(
+   mapping = aes(x = x, y = y, colour = group),
+   pointsize = 2
+ ) +
+ theme(
+   axis.text = element_blank(),
+   axis.ticks = element_blank(),
+   axis.title = element_blank(),
+   legend.position = "none"
+ ) +
+ facet_wrap(eta ~ perplexity,
+            labeller = label_both,
+            scales = "free",
+            ncol = 3) +
+ theme_bw()
+p2
+```
+
+De acuerdo a los valores que se usaron para perplexity y eta, se concluye que aquellos que muestran una mejor reducción de dimensiones son:
+
+*
+*
+
+
+
 ### 4.2.3 Modelo de UMAP
 
 ```{r}
