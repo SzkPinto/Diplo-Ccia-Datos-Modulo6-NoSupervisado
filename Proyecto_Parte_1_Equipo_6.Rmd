@@ -376,6 +376,315 @@ base_recipe <-
 ```
 
 ### 4.2.1 Modelo de PCA
+
+```{r}
+data<-read.csv("C:/Users/andre/OneDrive/Documentos/Diplo-Ccia-Datos-Modulo6-NoSupervisado/Sleep_health_and_lifestyle.csv")
+
+
+data_forPCA <- data[, !(names(data) %in% c("Blood.Pressure_d2", "Quality.of.Sleep"))]
+
+library(recipes)
+base_recipe <- 
+  recipe(Sleep.Disorder ~ ., data = data_forPCA) %>%
+  step_dummy(all_nominal_predictors()) %>%      # Variables categóricas a dummies
+  step_normalize(all_numeric_predictors()) %>%  # Escalar/normalizar y centrar numéricas
+  step_pca(all_numeric_predictors(), id = "pca") # PCA sobre las numéricas
+
+# Preparar la receta
+base_prep <- prep(base_recipe)
+```
+
+
+#### Extraer información de PCA
+```{r}
+
+base_pca <- 
+  base_prep %>% 
+  tidy(id = "pca")
+
+# Mostrar tabla con la carga de cada componente
+print(base_pca)
+
+```
+
+Aqui observamos que los traits que mas contribuyen al PC1 son edad y Gender_Male
+
+#### Graficos de varianza explicada por cada componente
+
+```{r}
+
+base_prep %>% 
+  tidy(id = "pca", type = "variance") %>% 
+  filter(terms == "percent variance") %>% 
+  ggplot(aes(x = component, y = value)) + 
+  geom_col(fill = "#B53389") + 
+  xlim(c(0, 30)) + 
+  labs(x = "PC", y = "% de varianza", title = "Scree plot")
+
+```
+
+ Observamos que son 3 componentes los que aportan mas del 10% de varianza cada uno
+
+
+```{r}
+# Gráfico de % acumulado de varianza explicada
+base_prep %>% 
+  tidy(id = "pca", type = "variance") %>% 
+  filter(terms == "cumulative percent variance") %>% 
+  ggplot(aes(x = component, y = value)) + 
+  geom_col(fill = "#F25E52") + 
+  xlim(c(0, 30)) + 
+  labs(x = "PC", y = "% acumulado de varianza", title = "Scree plot acumulado")
+
+```
+ El gráfico muestra que se necesitan **8 PC** para explicar >75% de la varianza total.
+
+#### Gráficos de barras horizontales, desplegando la contribución positiva o negativa
+
+
+```{r}
+# de las var a cada uno de los componentes
+base_pca %>%
+  mutate(terms = tidytext::reorder_within(terms, 
+                                          abs(value), 
+                                          component)) %>%
+  ggplot(aes(abs(value), terms, fill = value > 0)) +
+  geom_col() +
+  facet_wrap(~component, scales = "free_y") +
+  tidytext::scale_y_reordered() +
+  scale_fill_manual(values = c("#b6dfe2", "#0A537D")) +
+  labs(
+    x = "Absolute value of contribution",
+    y = NULL, fill = "¿Positive?"
+  ) +
+    theme(axis.text.y = element_text(size = 4))  # Ajusta el tamaño de letra del eje y
+```
+
+```{r}
+# Crear una lista de componentes por bloques
+componentes_bloques <- split(unique(base_pca$component), ceiling(seq_along(unique(base_pca$component))/10))
+
+# Graficar por bloques
+for (bloque in componentes_bloques) {
+  base_pca %>%
+    filter(component %in% bloque) %>%
+    mutate(terms = tidytext::reorder_within(terms, abs(value), component)) %>%
+    ggplot(aes(abs(value), terms, fill = value > 0)) +
+    geom_col() +
+    facet_wrap(~component, scales = "free_y") +
+    tidytext::scale_y_reordered() +
+    scale_fill_manual(values = c("#b6dfe2", "#0A537D")) +
+    labs(x = "Absolute value of contribution", y = NULL, fill = "¿Positive?") +
+    theme_minimal(base_size = 10) +
+    theme(axis.text.y = element_text(size = 6)) -> p
+  print(p)
+}
+```
+
+
+En el siguiente gráfico solo mostraremos los 6 primeros componentes principales
+
+```{r}
+
+# Mejorar la visualización reduciendo el número de componentes mostrados
+        library(forcats)
+base_pca %>%
+  filter(component %in% paste0("PC", 1:6)) %>%  #desplegar solo los 6 primeros componentes
+  mutate(component = fct_inorder(component)) %>%
+  ggplot(aes(value, terms, fill = terms)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~component, nrow = 1) +
+  labs(y = NULL)
+```
++ Observamos nuevamente que Age es la variable que contribuye mas al PC1 y 
+ + **Stress level junto con Heart_rate son los que mas contribuyen al PC2**
+
+De la misma forma podemos explorar la contribución de las traits a los compontentes 3.4.5.6
+
+
+#### Grafico de puntos coloreando en base a la categoría de Sleep.Disorder
+
+
+ Extraer PCA
+
+
+```{r}
+pca_scores <- juice(base_prep)
+head(pca_scores)  # Visualizamos
+pca_scores$Sleep.Disorder <- data$Sleep.Disorder #añadimos la var Sleep.Disorder porque la habiamos eliminado apra hacer el PCA
+     #grafica
+ggplot(pca_scores, aes(x = PC1, y = PC2, label = Sleep.Disorder)) +
+  geom_point(aes(color = Sleep.Disorder), alpha = 0.7, size = 2) +
+    labs(color = NULL,
+       title = "PCA de variables con Sleep.Disorder") +
+  theme_minimal()
+
+###3D
+```
+
+
+```{r}
+# Colores para rgl
+mycolors <- rainbow(length(unique(pca_scores$Sleep.Disorder)))
+pca_scores$color <- mycolors[as.numeric(pca_scores$Sleep.Disorder)]
+
+# Gráfico 3D con rgl
+plot3d(
+    x = pca_scores$PC1,
+    y = pca_scores$PC2,
+    z = pca_scores$PC3,
+    col = pca_scores$color,
+    type = 's',
+    radius = 0.1,
+    xlab = "PC1",
+    ylab = "PC2",
+    zlab = "PC3"
+)
+
+```
+#### Gráfico interactivo 3D con plotly
+
+
+```{r}
+library(plotly)
+library(rgl)
+
+g.df1 <- plot_ly(
+    pca_scores, 
+    x = ~PC1, 
+    y = ~PC2, 
+    z = ~PC3, 
+    color = ~Sleep.Disorder, 
+    colors = rainbow(length(unique(pca_scores$Sleep.Disorder)))  # colores automáticos
+) %>%
+    add_markers() %>%
+    layout(scene = list(
+        xaxis = list(title = 'PC1'),
+        yaxis = list(title = 'PC2'),
+        zaxis = list(title = 'PC3')
+    ))
+
+g.df1
+   # otra forma de hacer el mismo gráfico
+  # pero mas complicada :(
+```
+
+```{r}
+df1 <- pca_scores
+    #convertir en caracter los Sleep.Disorder, porque como factores no los reconoce
+df1 <- df1 %>%
+    mutate(Sleep.Disorder = as.character(Sleep.Disorder))
+```
+
+
+#### Hacemos subsets por categoria de Sleep.Disorder
+```{r}
+
+df1$Sleep.Disorder[df1$Sleep.Disorder == "None"] <- "N"
+df1$Sleep.Disorder[df1$Sleep.Disorder == "Insomnia"] <- "I"
+df1$Sleep.Disorder[df1$Sleep.Disorder == "Sleep Apnea"] <- "A"
+df1$Sleep.Disorder <- as.factor(df1$Sleep.Disorder)
+
+table(df1$Sleep.Disorder)
+```
+
+
+```{r}
+fig <- plot_ly(df1, x = ~PC1, y = ~PC2, z = ~PC3, color = ~Sleep.Disorder, colors = c('#BF382A', '#0C4B8E', "green"))
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'PC1'),
+                                   yaxis = list(title = 'PC2'),
+                                   zaxis = list(title = 'PC3')))
+
+fig
+
+```
+
+# Aqui voy!!! Falta trabajar mas esta sección
+######################### Graficos biplots y demás
+### Para ello necesitamos usar esta metodología para el PCA
+###PCA
+
+
+
+```{r}
+pca_fit <- data_forPCA %>%
+    select(where(is.numeric)) %>%
+    scale() %>%
+    prcomp()
+
+
+
+```
+
+
+####  Biplot de variables
+```{r}
+
+library(factoextra)
+library(ggord)  # solo si quieres usar ggord
+
+fviz_pca_var(pca_fit,
+             alpha.var = "contrib",
+             col.var = "contrib", 
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             title = 'Influencia de las variables en PCA1 y PCA2',
+             repel = TRUE)
+```
+
+####  Distribución de los individuos (coloreados por contribución)
+
+```{r}
+
+fviz_pca_ind(pca_fit,
+             col.ind = "contrib", 
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             title='Distribución de los individuos en PCA1 y PCA2',
+             repel = TRUE)
+```
+
+####  Biplot general (variables en azul, individuos en gris)
+
+```{r}
+
+fviz_pca_biplot(pca_fit, repel = TRUE,
+                title='Biplot',
+                col.var = "#2E9FDF",
+                col.ind = "#696969")
+```
+
+⃣#### Gráfico tipo ggord coloreando individuos por Sleep.Disorder
+
+```{r}
+
+ggord(pca_fit, df1$Sleep.Disorder)
+```
+
+```{r}
+
+#  Biplot con colores por Sleep.Disorder y elipses de confianza
+fviz_pca_biplot(pca_fit, repel = TRUE,
+                col.var = "blue", 
+                col.ind = df1$Sleep.Disorder, 
+                palette = c("#BF382A", "#0C4B8E", "green"),
+                addEllipses = TRUE, 
+                ellipse.level = 0.95,
+                title = "Biplot PCA con Sleep.Disorder")
+
+```
+
+
+```{r}
+fviz_pca_biplot(pca_fit,
+                repel = TRUE,              # Evita que las etiquetas se encimen
+                col.var = "#2E9FDF",       # Color de las flechas (variables)
+                col.ind = "#696969",       # Color de los puntos (individuos)
+                arrowsize = 0.8,           # Tamaño de flechas
+                pointsize = 2,             # Tamaño de puntos
+                title = "Biplot PCA: Variables y Individuos")
+```
+
+
 ### 4.2.2 Modelo de tSNE
 ### 4.2.3 Modelo de UMAP
 
