@@ -565,3 +565,9 @@ fviz_pca_biplot(pca_fit, repel = TRUE,
                 title = "Biplot PCA con Sleep.Disorder")
 
 ```
+
+
+```{r}
+base_prep %>% tidy(id = "pca") %>% filter(str_detect(terms, "blood"))
+```
+

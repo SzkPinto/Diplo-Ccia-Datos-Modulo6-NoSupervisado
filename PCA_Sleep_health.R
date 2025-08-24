@@ -152,7 +152,7 @@ cor_data <- cor(num.dat) #num.dat contiene solo las var numericas
 cor_data
 
 # Exploramos las correlaciones Spearman y vemos resultados similares a las cor de Pearson
-cor1_data<-cor(numeric_data[,],method="spearman")
+cor1_data<-cor(num.dat[,],method="spearman")
 ggcorrplot::ggcorrplot(corr = cor1_data,
                        type = "lower", 
                        show.diag = TRUE,
