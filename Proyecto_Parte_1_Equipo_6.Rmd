@@ -430,6 +430,12 @@ base_pca <-
 # Mostrar tabla con la carga de cada componente
 print(base_pca)
 
+
+library(writexl)
+
+write_xlsx(base_pca, "base_pca.xlsx")
+
+
 ```
 
 Aqui observamos que los traits que mas contribuyen al PC1 son edad y Gender_Male
@@ -708,6 +714,53 @@ fviz_pca_biplot(pca_fit,
                 pointsize = 2,             # Tamaño de puntos
                 title = "Biplot PCA: Variables y Individuos")
 ```
+
+```{r}
+summary(pca_fit)
+
+```
+
+```{r}
+fviz_eig(pca_fit, addlabels = TRUE, ylim = c(0, 100))
+
+```
+
+
+
+#### Conclusiones PCA
+
+El análisis de componentes principales pemitió reducir la dimensionalidad del conjunto de datos q < p, siendo q la nueva dimensión conservando la mayor cantidad de varianza original. Los 2 componentes principales explicaron el **73.16%** de variabilidad total, lo cual nos ayuda a representar en una gráfica de 2D ó R2, al mismo tiempo, los últimos componentes, los últimos 3 representan al rededor del 13 %, por lo que se puede prescindir de ellos.
+
+Según la regla del codo, los tres primeros componentes explican el 86.4% de la variabilidad total, lo que sugiere que podrían ser suficientes para representar la estructura latente del fenómeno. Sin embargo, para fines de visualización y simplicidad, dos componentes ya ofrecen una representación robusta (73.16%).
+
+La componente principal 1 (PC1) está influenciada por:
+  - Age (0.39)
+  - Occupation_Nurse (0.36)
+  - Gender_Male (-0.35)
+  - BMI_Category_Overweight (0.30)
+  - Occupation_Doctor (-0.27)
+
+Esto indica que PC1 captura un eje relacionado con características demográficas y ocupacionales, donde la edad y el sobrepeso (BMI) tienen una influencia positiva, mientras que ser hombre o médico se asocia negativamente.
+
+Mientras que la componente principal 2 (PC2) está influenciada por:
+
+  - Heart.Rate (0.43)
+  - Stress.Level (0.38)
+  - Sleep.Duration (-0.35)
+  - Occupation_Engineer (-0.33)
+La carga negativa de Sleep.Duration y positiva de Stress.Level en PC2 sugiere una relación inversa entre ambas variables, lo cual es coherente con literatura clínica: mayor estrés suele asociarse con menor duración del sueño.
+
+Mientras que la componente principal 3 (PC3) está influenciada por:
+
+  - Physical.Activity.Level	(-0.36)
+  - Daily.Steps	(-0.39)
+  - Occupation_Teacher	(0.32)
+  - Blood.Pressure_X135.90	(0.30)
+  
+Posiblemente los pasos diarios tiene multicolonealidad con actividad física, por lo que podríamos prescindir de una, así como podría ser que la duración del sueño este correlacionada con el nivel de estrés.
+
+Al final este ejercicio de PCA nos ayudó a no solo reducir la dimensionalidad del fenómeno, sino a identificar patrones latentes que vinvulan características fiaiológicas de cada individuo, ocupaciones y conductuales del transtorno del sueño, como actividad fisica y la presión sanguínea, nivel de estres y dración del sueño o el peso conforme a la edad.Lo cual si lo llevaríamos al ML, ya podríamos solo enfocarnos en 2 o 3 componentes principales que expliquen entre el 70 y 80% del fenómeno.
+
 
 
 ### 4.2.2 Modelo de tSNE
