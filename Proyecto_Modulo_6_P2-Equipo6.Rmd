@@ -783,7 +783,7 @@ for (k in 2:12) {
 }
 
 avg_sil <- sapply(2:12, function(k) {
-  sil <- silhouette(res_clara[[k]]$clustering, dist(df_clara))
+  sil <- cluster::silhouette(res_clara[[k]]$clustering, dist(df_clara))
   mean(sil[, 3])
 })
 
@@ -850,7 +850,8 @@ Con k=1 (GAP), todos los puntos son considerados parte de un único grupo, lo cu
 set.seed(123)
 umap_coords <- umap(as.matrix(df_clara), n_neighbors = 30, min_dist = 0.1, n_components = 2)
 
-umap_df <- as.data.frame(umap_coords)
+umap_df <- as.data.frame(umap_coords$layout)  # ← Aquí está la clave
+
 colnames(umap_df) <- c("UMAP1", "UMAP2")
 umap_df$Cluster_sil <- factor(final_clara_sil$clustering)
 umap_df$Cluster_gap <- factor(final_clara_gap$clustering)
@@ -885,6 +886,8 @@ df <- df %>%
 
 table(df$Sleep.Disorder)
 ```
+
+
 
  
 
@@ -1264,7 +1267,7 @@ optics_model <- optics(final_data_scaled, eps = 50, minPts = 5)
 # Asignación de clusters
 clusters <- extractDBSCAN(optics_model, eps_cl = 50)
 cluster_factor <- factor(clusters$cluster)
-data1$Cluster <- cluster_factor
+df$Cluster <- cluster_factor
 
 ```
 
@@ -1277,10 +1280,11 @@ umap_coords <- umap(as.matrix(final_data_scaled),
                     min_dist = 0.1,
                     n_components = 2)
 
-umap_df <- as.data.frame(umap_coords)
+umap_df <- as.data.frame(umap_coords$layout)
 colnames(umap_df) <- c("UMAP1", "UMAP2")
 umap_df$Cluster <- cluster_factor
-umap_df$Sleep.Disorder <- data1$Sleep.Disorder
+umap_df$Sleep.Disorder <- df$Sleep.Disorder
+
 
 ```
 
@@ -1330,10 +1334,10 @@ head(df)
 ```{r}
 # Selecciona tus variables categóricas clave (ajusta si tu CSV difiere)
 cat_vars <- c("Gender", "Occupation", "BMI.Category", "Sleep.Disorder")
-cat_data <- data1[, cat_vars]
+cat_data <- df[, cat_vars]
 
 # Numéricas (todas las columnas que ya son numeric)
-num_data <- data1[, sapply(data1, is.numeric)]
+num_data <- df[, sapply(df, is.numeric)]
 
 # One-hot encoding para categóricas
 dummies <- caret::dummyVars(~ ., data = cat_data)
@@ -1361,23 +1365,23 @@ hdb <- hdbscan(final_data_scaled, minPts = minPts_val)
 
 # Etiquetas (0 = ruido, >0 = id de cluster)
 clusters_hdb <- hdb$cluster
-data1$Cluster_HDB <- factor(ifelse(clusters_hdb == 0, "Noise", paste0("C", clusters_hdb)))
+df$Cluster_HDB <- factor(ifelse(clusters_hdb == 0, "Noise", paste0("C", clusters_hdb)))
 
 # Probabilidad de pertenencia (confianza) por punto
-data1$HDB_Membership <- hdb$membership_prob
+df$HDB_Membership <- hdb$membership_prob
 
 # Resúmenes útiles
-table(data1$Cluster_HDB)
-summary(data1$HDB_Membership)
+table(df$Cluster_HDB)
+summary(df$HDB_Membership)
 
 ```
 ```{r}
 # % de ruido
-prop_noise <- mean(data1$Cluster_HDB == "Noise")
+prop_noise <- mean(df$Cluster_HDB == "Noise")
 
 # Calidad de pertenencia por cluster
 library(dplyr)
-calidad <- data1 %>%
+calidad <- df %>%
   group_by(Cluster_HDB) %>%
   summarise(n = n(),
             mean_prob = mean(HDB_Membership),
@@ -1454,11 +1458,11 @@ umap_coords <- umap(
   metric = "euclidean"
 )
 
-umap_df <- as.data.frame(umap_coords)
+umap_df <- as.data.frame(umap_coords$layout)
 colnames(umap_df) <- c("UMAP1", "UMAP2")
-umap_df$Sleep.Disorder <- data1$Sleep.Disorder
-umap_df$Cluster_HDB    <- data1$Cluster_HDB
-umap_df$Membership     <- data1$HDB_Membership
+umap_df$Sleep.Disorder <- df$Sleep.Disorder
+umap_df$Cluster_HDB    <- df$Cluster_HDB
+umap_df$Membership     <- df$HDB_Membership
 
 ```
 
@@ -1536,7 +1540,7 @@ pct_noise_hdb <- mean(clusters_hdb == 0) * 100
 # --- Métricas externas opcionales si tienes etiqueta 'Sleep.Disorder' ---
 # ARI: qué tanto coinciden clusters con las clases de Sleep.Disorder
 # NMI: información compartida normalizada (requiere 'aricode')
-label_true <- as.factor(data1$Sleep.Disorder)
+label_true <- as.factor(df$Sleep.Disorder)
 ari <- tryCatch({
   if (length(unique(label_true)) > 1) mclust::adjustedRandIndex(label_true, as.factor(clusters_hdb)) else NA_real_
 }, error = function(e) NA_real_)
