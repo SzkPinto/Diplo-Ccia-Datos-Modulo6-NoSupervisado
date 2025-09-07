@@ -1,0 +1,1009 @@
+---
+title: "Proyecto Final: Análisis de Reducción de Dimensiones"
+author:
+  - "Morales González Susan"
+  - "Pinto González Reyna Suzuky"
+  - "Reyes Román Eduardo"
+  - "Ruiz Jiménez Reynaldo David"
+  - "Vital Arana José Andrés de Jesús"
+  - "Zetina Rosas Enya"
+  - "Equipo 6:"
+date: "r Sys.Date()"
+output:
+  pdf_document:
+    toc: true
+    latex_engine: xelatex
+  html_document:
+    toc: true
+    toc_float: true
+    theme: readable
+    highlight: tango
+    df_print: paged
+  word_document:
+    toc: true
+    # reference_docx: mi_plantilla_word.docx # Descomenta para usar tu plantilla de Word
+header-includes:
+  - \usepackage[spanish]{babel}
+always_allow_html: true
+---
+
+
+# Métodos de Reducción de Dimensiones
+
+## 1. Introducción
+
+Actualmente en cualquier sector, la capacidad para extraer valor de conjuntos de datos masivos y complejos es un diferenciador clave. Sin embargo, tener una alta dimensionalidad o número de variables en los conjuntos de datos, suele a menudo ocultar patrones cruciales para la toma de decisiones, haciendo a los modelos menos eficientes y más costosos de implementar. Entre los objetivos más relevantes como científico de datos es resolver este reto de transformar la complejidad en claridad.
+
+Este proyecto es una demostración práctica de cómo utilizar técnicas de reducción de dimensionalidad para purificar la información más relevante de un dataset, sentando las bases para un análisis más rápido, una visualización más intuitiva y un modelado predictivo más potente.
+
+En este análisis demuestra la competencia en tres técnicas fundamentales de reducción de dimensionalidad —PCA, t-SNE y UMAP—. El objetivo no es solo aplicar los algoritmos, sino evaluar su efectividad para simplificar un conjunto de datos sin sacrificar la Estructura de Asociación que tienen los datos originales.
+
+## 2. Contexto de la información
+
+Para este análisis el conjunto de datos es un compendio de parámetros asociados con la calidad del sueño y estilo de vida de 400 personas con 13 variables de medición
+
+El sueño desempeña un papel fundamental en el mantenimiento de nuestra salud y bienestar general. Comprender los factores que influyen en la salud del sueño y el estilo de vida puede proporcionar información valiosa para optimizar los patrones de sueño. Buscar una profundización con un análisis exhaustivo de datos sobre salud del sueño y estilo de vida, revelará interesantes relaciones entre la duración del sueño, la actividad física, los niveles de estrés y la calidad del sueño.
+
+
+### Descripción de las variables:
+
+- ID de Persona: Un identificador para cada individuo.
+- Género (Gender): El género de la persona (Hombre/Mujer).
+- Edad (Age): La edad de la persona en años.
+- Ocupación (Ocupation): La ocupación o profesión de la persona.
+- Duración del Sueño (Sleep Duration-horas): El número de horas que la persona duerme al día.
+- Calidad del Sueño (Quality of Sleep- escala: 1-10): Una calificación subjetiva de la calidad del sueño, del 1 al 10.
+- Nivel de Actividad Física (Physical Activity Level- minutos/día): El número de minutos que la persona realiza actividad física diariamente.
+- Nivel de Estrés (Stress Level- escala: 1-10): Una calificación subjetiva del nivel de estrés que experimenta la persona, del 1 al 10.
+- Categoría de IMC (BMI Category): La categoría de índice de masa corporal (IMC) de la persona (p. ej., Bajo Peso, Normal, Sobrepeso).
+- Presión Arterial (Blood Pressure- Sistólica/Diastólica): La medición de la presión arterial de la persona, indicada como presión sistólica sobre presión diastólica. Frecuencia cardíaca (lpm): Frecuencia cardíaca en reposo de la persona    en latidos por minuto.
+- Frecuencia cardiaca (Heart rate- lpm): número de veces que el corazón late por minuto.
+- Pasos diarios (Daily Steps): Número de pasos que da la persona al día.
+- Trastorno del sueño (Sleep Disorder): Presencia o ausencia de un trastorno del sueño en la persona (ninguno, insomnio, apnea del sueño).
+
+* Nota: El análisis utiliza los nombres en inglés.
+
+Se usará como variable clasificatoria "Sleep.Disorder" o Transtorno del sueño. La cuál tiene el siguiente contenido:
+
+- None: El individuo no presenta ningún trastorno específico del sueño.
+- Insomnia: El individuo experimenta dificultad para conciliar o mantener el sueño, lo que conduce a un descanso inadecuado o de mala calidad.
+- Sleep Apnea: El individuo sufre pausas en la respiración durante el sueño, lo que provoca patrones de sueño interrumpidos y posibles riesgos para la salud.
+
+## 3. Desarrollo de Técnico
+
+Activación librerías
+```{r, message=FALSE, warning=FALSE}
+source('R-libraries-ICdD.r')
+library(webshot2)
+library(rgl)      
+knitr::opts_chunk$set()  
+rgl::setupKnitr() 
+knitr::opts_chunk$set(
+  fig.width  = 7,        # ancho en pulgadas
+  fig.height = 5,        # alto en pulgadas
+  fig.align  = "center", # centra las figuras en el PDF
+  dpi        = 300,       # buena resolución
+  rgl.useNULL = TRUE, 
+  fig.retina = 2
+)
+
+```
+
+Importación la información
+```{r, message=FALSE, warning=FALSE}
+df<- read_csv("Sleep_health_and_lifestyle.csv") %>% data.frame()
+```
+### 3.1 Análisis Exploratorio
+
+```{r}
+df |> dim()
+```
+
+Si bien la documentación del conjunto de datos menciona 400 observaciones, el documento contiene 374 y, 12 variables en lugar de 400 registros y 13 columnas, la adicional es el ID
+
+```{r}
+df |>head()
+```
+
+La variable Blood Preassure se debe ajustar porque es una medida cuantitativa que se cargó como carácter. Hagamos la separación de los registros como: Sistólica y Diastólica para incluirla de manera adecuada en la reducción de Dimensionalidad y verifiquemos que hizo adecuadamente la separación
+
+```{r}
+df <- df %>%
+  separate(Blood.Pressure, into = c("sistolica_bp", "diastolica_bp"), sep = "/", convert = TRUE)
+df |> head()
+```
+
+
+### Descripción general de la tabla de datos
+
+```{r}
+df |> 
+  vis_dat() +
+  labs(title = "Estructura y Clases de Variables del Conjunto de datos de Sueño") +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=0),
+    axis.text.y = element_text(size = 8)
+  )
+```
+
+No se detectaron datos perdidos, por lo que no es necesario la imputación de ellos
+
+Por otro lado, se encontraron cinco columnas de tipo carácter.
+
+Esto es muy importante porque no es adecuado usar la matriz de correlación de Pearson en todo el Data Set y el ajuste de un PCA, por lo tanto, se calculará una matriz de correlación Policórica para entender el grado de la Estructura de Asociación de los datos y aplicar de manera correcta los métodos de reducción de dimensionalidad
+
+
+
+### Estadísticas elementales de los datos numéricos
+
+```{r}
+df |> skimr::skim() |> skimr::yank("numeric")
+```
+
+
+### EDA variables numéricas
+```{r}
+df |> plot_num()
+```
+
+De acuerdo con la información numérica, es posible contextualizar que la información proviene de adultos con un rango entre 27 y 59 años, con mayor concentración aproximadamente en los 43 años y con una duración de sueño adecuada ya que en promedio dura  7.13 horas y, en términos de percepción consideran que su Calidad de Sueño es mediana calificándola mayormente con un 7, pero nadie llega a la excelencia
+
+Hay evidencia para plantear la hipótesis que las personas que proporcionan esta información no tienen sedentarismo porque al menos hacen actividad física por 30 min, en promedio es una hora; podrían tener rutinas de entrenamiento de algún deporte o actividad específica. 
+
+Los niveles de estrés aparentan bastante uniformidad, incluso la mayoría consideran que son bajos niveles, probablemente perciben pocos niveles o reducción de estos debido a la actividad física realizada.
+
+En términos médicos, los participantes tienen una presión arterial alta, con pocos casos de Hipertensión; considerado como referencia:
+
+
+- Normal: Menos de 120/80 mm Hg.
+- Elevada: 120-129 sistólica y menos de 80 diastólica.
+- Hipertensión Nivel 1: 130-139 sistólica o 80-89 diastólica.
+- Hipertensión Nivel 2: 140 o mayor sistólica o 90 o mayor diastólica.
+
+### EDA variables categóricas
+
+
+```{r, message=FALSE, warning=FALSE}
+df |> freq()
+```
+
+Respecto a la exploración en las variables categóricas; el balance de muestra entre hombre y mujeres no está cargado a un género en específico, lo que podría darnos tranquilidad en futuros resultados ya que no serían determinados por algún sexo.
+
+Respecto a las profesiones, acá aparentemente si hay una indicación de sesgo, el 38.5% de la información trabaja en el área de la salud, esto podría afectar Modelos Supervisados ya que la predicción sería para un cierto sector. Se recomienda cruzar la distribución de las profesiones con las cuotas del país en que se recolecto la información para buscar representatividad. 
+
+Finalmente y, como en la mayoría de casos, aquellos pacientes con enfermedad hay una minoría que la sufre, en este caso 20.86% de los individuos reporta Trastorno de Sueño y quién se reporta libre de síntomas es la mayoría con 58.56%; esto se debe tener presente al implementar métodos Supervisados y considerar balance en los algoritmos a implementar.
+
+### Agrupamiento de la información versus la varible respuesta. 
+
+Los métodos no supervisados no tienen como objetivo principal considerar una variable respuesta para procesar la información, sin embargo, es adecuado revisar (sin tanta profundidad) como es el comportamiento de la información considerando la variable clasificadora
+
+Comparación para las variables numéricas versus la de clasificacion o respuesta
+
+```{r}
+df1 <- df |> dplyr::select(where(is.numeric)) %>% mutate(df$Sleep.Disorder)
+colnames(df1)=c("Age","Sleep.Duration","Quality.of.Sleep","Physical.Activity.Level","Stress.Level","sistolica_bp","diastolica_bp","Heart.Rate","Daily.Steps","Sleep.Disorder")
+```
+
+Cambio a data set Long
+
+```{r}
+df_long <- df1 %>% 
+    pivot_longer(!Sleep.Disorder, names_to = "predictores", values_to = "values")
+df_long |> head()
+```
+
+```{r}
+
+df_long %>%
+  ggplot(mapping = aes(x = Sleep.Disorder, y = values, fill = Sleep.Disorder)) +
+  geom_boxplot() +
+  facet_wrap(~ predictores, scales = "free", ncol = 3) + # <-- 1. Reducimos el número de columnas
+  scale_fill_viridis_d(option = "plasma", end = .7) + # <-- 2. Corregido a scale_fill
+  labs(
+    title = "Comparación de Variables por Trastorno del Sueño",
+    x = "Trastorno del Sueño", # <-- 3. Añadimos etiquetas a los ejes
+    y = "Valor"
+  ) +
+  theme_minimal() + # <-- 4. Usamos un tema base más limpio
+  theme(
+    # --- Ajustes para reducir el amontonamiento ---
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 7), # <-- 5. Rotamos y achicamos el texto del eje X
+    strip.text = element_text(size = 8, face = "bold"), # <-- 6. Achicamos el texto de las facetas
+    axis.title = element_text(size = 9), # <-- 7. Ajustamos el tamaño de los títulos de los ejes
+    
+    # --- Ajustes adicionales ---
+    plot.title = element_text(hjust = 0.5, size = 16), # Centramos y ajustamos el título principal
+    legend.position = "none" # Mantenemos la leyenda oculta
+  )
+
+```
+
+```{r}
+df_long |>
+  ggplot(mapping = aes(x = values, fill = Sleep.Disorder)) +
+  # 1. Usamos 'alpha' para transparencia en lugar de 'color'
+  geom_density(alpha = 0.7, show.legend = FALSE) + 
+  facet_wrap(~predictores, scales = "free", ncol = 3) + # <-- 2. Reducimos el número de columnas
+  scale_fill_viridis_d(option = "plasma", end = .7) +  # <-- 3. Corregido a scale_fill_*
+  labs(
+    title = "Distribución de Variables por Trastorno de Sueño", # <-- 4. Título único y claro
+    x = "Valor del Feature",
+    y = "Densidad",
+    fill = "Trastorno" # Título para la leyenda
+  ) +
+  theme_minimal() +
+  theme(
+    # --- Ajustes de tamaño y posición ---
+    plot.title = element_text(size = 16, hjust = 0.5),    # Título principal
+    strip.text = element_text(size = 9, face = "bold"), # Títulos de las facetas (más pequeños)
+    axis.title = element_text(size = 10),               # Títulos de los ejes
+    axis.text = element_text(size = 8),                 # Texto en los ejes (números)
+    
+    legend.position = "bottom",                         # <-- 5. Movemos la leyenda abajo
+    legend.title = element_text(size = 10),             # Título de la leyenda
+    legend.text = element_text(size = 8)                # Texto de la leyenda (más pequeño)
+  )
+```
+
+Con ayuda de las dos gráficas anteriores, la distribución de los datos por cada tipo de Transtorno de sueño es diferente. Si bien, no es necesario contar con una variable clasificadora para la reducción de dimensiones, con estas diferencias en la distribución si podríamos tomar a "Sleep.Disorder" como una variables que nos ayude en el análisis de los resultados de las técnicas que vamos a evaluar. 
+
+
+```{r}
+ggpairs(
+  df1, 
+  mapping = aes(color = Sleep.Disorder),
+  columns = seq(1, 8),
+  progress = FALSE,
+  title = "Matriz de Dispersión y Densidad por Trastorno de Sueño",
+  
+  # --- Aquí está la nueva sección ---
+  upper = list(
+    continuous = wrap(ggally_cor, size = 2) # <-- 1. Ajustamos el tamaño del texto de la correlación
+  )
+  # --- Fin de la nueva sección ---
+
+) +
+theme_minimal() +
+theme(
+  plot.title = element_text(size = 16, hjust = 0.5),
+  strip.text = element_text(size = 5, face = "bold"),
+  axis.text = element_text(size = 6),
+  legend.position = "bottom",
+  legend.title = element_text(size = 10),
+  legend.text = element_text(size = 8)
+)
+```
+
+En la mayoría de los casos, las correlaciones mejoran al hacer los subgrupos por trastorno de sueño, si bien no es indespensable hacer una clusterización previamente, revisar resultados desde los grupos considerando la agrupación nos dará una mejor perspectiva para evaluar los resultados de cada algoritmo.
+
+Incorporemos al análisis previo las variables categóricas
+```{r}
+data_dummies <- df %>%
+  select(-Sleep.Disorder) %>%
+  mutate(across(where(is.character), as.factor)) %>%
+  model.matrix(~ . - 1, data = .) %>%
+  as.data.frame()
+
+data_ready <- bind_cols(Sleep.Disorder = df$Sleep.Disorder, data_dummies)
+```
+
+```{r}
+data_long2 <- data_ready %>%
+  pivot_longer(cols = -Sleep.Disorder, names_to = "variable", values_to = "value")
+```
+
+```{r}
+library(ggplot2)
+
+ggplot(data_long2, aes(x = Sleep.Disorder, y = value, fill = Sleep.Disorder)) + # <-- 1. Añadimos color
+  geom_boxplot(show.legend = FALSE) + # <-- 2. Ocultamos la leyenda (es redundante)
+  facet_wrap(~ variable, scales = "free", ncol = 3) +
+  theme_minimal() +
+  labs(
+    title = "Distribución de Variables por Trastorno del Sueño",
+    x = "Trastorno del Sueño",
+    y = "Valor"
+  ) +
+  scale_fill_viridis_d(option = "plasma", end = 0.9) + # <-- 3. Aplicamos una paleta de colores
+  theme(
+    # --- Ajustes de texto y títulos ---
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    strip.text = element_text(size = 8, face = "bold"), # Títulos de las facetas
+    axis.title = element_text(size = 10),
+    
+    # --- Ajuste clave para evitar amontonamiento ---
+    axis.text.x = element_text(angle = 90, vjust = 1, hjust = 1, size = 7),
+    axis.text.y = element_text(size = 7)
+  )
+```
+
+Observamos variables poco informativas como Ocupation: Doctor, donde todas los grupos de Sleep.disorder se ven igual Los contrastes interesantes se muestran en las var edad, Blood.preasure_d2 y s1, Daily.steps,Heart.rate,
+    #physical activity, stress.level, Sleep.duration y quality of sleep
+
+```{r}
+ggplot(data_long2, aes(x = value, fill = Sleep.Disorder)) +
+  geom_density(alpha = 0.7) + # 1. Usamos alpha para ver las superposiciones
+  facet_wrap(~ variable, scales = "free", ncol = 3) + # 2. Reducimos a 3 columnas
+  theme_light() +
+  labs(
+    title = "Comparación de Densidades por Trastorno del Sueño", # 3. Título único y centrado
+    x = "Valor de la Variable",
+    y = "Densidad",
+    fill = "Trastorno de Sueño:" # Título para la leyenda
+  ) +
+  scale_fill_viridis_d(option = "plasma", end = 0.9) + # 4. Corregido a scale_fill_*
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    strip.text = element_text(size = 8, face = "bold"),
+    axis.title = element_text(size = 10),
+    axis.text = element_text(size = 8),
+    
+    # --- Ajuste clave para el layout ---
+    legend.position = "bottom", # 5. Movemos la leyenda abajo
+    legend.title = element_text(size = 8),
+    legend.text = element_text(size = 7)
+  )
+```
+
+Con esta visualizaciónm se confirma relaciones poco informativas como Ocupation: Doctor, donde todas los grupos de Sleep.disorder se ven igual
+
+Los contrastes interesantes se muestran en las var edad, Blood.preasure_d2 y s1, Daily.steps,Heart.rate, physical activity, stress.level, Sleep.duration y quality of sleep
+
+```{r, message=FALSE, warning=FALSE}
+ggpairs(
+  data_ready, 
+  mapping = aes(color = Sleep.Disorder),
+  columns = seq(1, 11),
+  progress = FALSE,
+  title = "Matriz de Dispersión y Densidad por Trastorno de Sueño",
+  
+  # --- Aquí está la nueva sección ---
+  upper = list(
+    continuous = wrap(ggally_cor, size = 2) # <-- 1. Ajustamos el tamaño del texto de la correlación
+  )
+  # --- Fin de la nueva sección ---
+
+) +
+theme_minimal() +
+theme(
+  plot.title = element_text(size = 16, hjust = 0.5),
+  strip.text = element_text(size = 5, face = "bold"),
+  axis.text = element_text(size = 6),
+  legend.position = "bottom",
+  legend.title = element_text(size = 10),
+  legend.text = element_text(size = 8)
+)
+```
+
+La visualización tradicional de las variables categóricas vs. las numéricas es poco efectiva ya que se incluyen muchas Dummies que lanzan a los extremos los puntos en una gráfica de Dispersión
+
+### Estructura de Asociación de los datos
+
+Revisar la Estructura de Asociación de los datos es clave antes de implementar cualquier algoritmo, ya que nos brindará información preliminar de la reducción de dimensiones que se tendrá, si podrá ser profunda o dicha reducción no será drástica.
+
+Se plantean 4 revisiones para entender el grado de asociación, son los siguientes con sus respectivos criterios de evaluación:
+
+1.	Valores cercanos a -1 o 1 en la matriz de correlación, cuánto más datos cercanos a 1 tengamos la asociación será más fuerte
+2.	Determinante de la matriz de correlación. Este debe ser 0 o tener valores que indiquen una tendencia a cero
+3.	Indicador KMO (cercano a 1, relación fuerte entre las variables)
+4.	Prueba de Bartlett, indica que la Matriz es distinta de la Identidad (Rechazar $H_0$, con un p-value próximo a Cero) y por lo tanto hay correlación fuera de la diagonal
+Como lo mencionamos líneas previas, el conjunto de datos tienen variables tanto numéricas como no numéricas, por lo que se debe ajustar una matriz de correlación. 
+
+Como se ha mencionado anteriormente, al tener variables numéricas y no numéricas, no se puede usar el coeficiente de correlación de Pearson, por lo que haremos uso de la matriz de correlación Policórica. 
+
+##### Matriz de Correlación Policórica con el paquete 'polycor'
+
+Primero definimos cuál es la información categórica
+
+```{r}
+df_prepared <- df %>%
+  mutate(
+    Gender = as.factor(Gender),
+    Occupation = as.factor(Occupation),
+    Sleep.Disorder = as.factor(Sleep.Disorder),
+    # Convertir las variables a factores ordenados
+    quality_of_sleep_ord = factor(Quality.of.Sleep, ordered = TRUE),
+    stress_level_ord = factor(Stress.Level, ordered = TRUE),
+    # Para 'bmi_category', debemos especificar el orden correcto de los niveles
+    bmi_category_ord = factor(BMI.Category, 
+                              levels = c("Normal", "Overweight", "Obese"),
+                              ordered = TRUE)
+  )
+```
+
+Cálculo de la matriz de Correlación Policórica
+
+```{r, message=FALSE, warning=FALSE}
+correlation_matrix <- hetcor(df_prepared)
+```
+
+Visualización de los valores de la matriz. Aquí responderemos el primer criterio
+
+```{r, message=FALSE, warning=FALSE}
+library(ggcorrplot)
+library(ggplot2)
+# 1. Crear el objeto ggcorrplot con ajustes iniciales
+corr_plot <- ggcorrplot(
+  corr = correlation_matrix$correlations,
+  type = "lower",
+  show.diag = FALSE, # Ocultar la diagonal para mayor limpieza
+  lab = TRUE,
+  lab_size = 2.5,    # <-- Tamaño de los números de correlación, reducido para que quepan mejor
+  ggtheme = theme_light(), # Usar un tema base limpio
+  colors = c("red", "white", "green") # Paleta de colores clásica: azul (neg), blanco (cero), rojo (pos)
+)
+
+# 2. Añadir personalizaciones de ggplot2
+corr_plot +
+  labs(title = "Matriz de Correlación de Salud del Sueño") +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    # Ajusta el texto de los ejes para mejor lectura
+    axis.text.x = element_text(angle = 90, vjust = 1, hjust = 1, size = 8),
+    axis.text.y = element_text(size = 8),
+    # Ajusta la leyenda
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 8)
+  )
+```
+
+(1) De acuerdo a la matriz - mapa de calor, su hay una mayoría de valores con un nivel de correlación fuerte, ya sea a -1, lo ideal es tener todo muy concentrado, sin embargo, que sea la mayoría cumple con lo necesario este criterio. 
+
+Determinante de la Matriz
+```{r}
+det(correlation_matrix$correlations)
+```
+
+ (2) El determinante de la matriz Policórica es bastante pequeño, tiende a cero. Cumple con este criterior adecuadamente
+
+Indicador KMO (cercano a 1, relación fuerte entre las variables)
+
+```{r}
+psych::KMO(correlation_matrix$correlations)
+```
+
+ (3) El valor KMO es 0.54, si bien no es cercano a 1, no está cerca del cero por lo que cumple el criterio mediananmente 
+
+Prueba que la Matriz es distinta de la Identidad (Rechazar $H_0$, pvalue proximo a Cero) y por lo tanto hay correlación fuera de la diagonal
+
+```{r}
+psych::cortest.bartlett(correlation_matrix$correlations,n=dim(df1)[1])
+
+```
+
+ (4) Se rechaza la hipótesis nula de Bartlerr, por lo que es posible consluir que hay una correlación fuera de la diagonal. El criterio se cumple adecuadamente. 
+ 
+ Por lo tanto, por (1), (2), (3) y (4), hay una buena Estructura de Asociación, muy grande pero los datos son buenos para implementar los algoritmos mencionados y encontrar una reducción de Dimensionalidad sustentada y robusta. 
+ 
+ Adicional, en un punto de vista contextual con los datos, para futuros Análisis Supervisados
+ 
+ El análisis de correlaciones revela patrones claros en la relación entre el sueño, el estrés, la actividad física y los indicadores de salud:
+
+- Existe una **relación negativa muy fuerte entre la calidad del sueño y el nivel de estrés (-0.92)**, lo que confirma la importancia del descanso adecuado en el bienestar psicológico.
+- La **duración del sueño se asocia positivamente con la calidad del sueño (0.89)** y negativamente con el estrés (-0.81), reforzando la idea de que dormir más horas contribuye a reducir la tensión emocional.
+- Se observa que **una mejor calidad de sueño se relaciona con una frecuencia cardíaca más baja (-0.66)**, mientras que niveles altos de estrés se vinculan con una frecuencia más elevada (0.67).
+- En cuanto a la actividad física, los **pasos diarios muestran una fuerte correlación con el nivel de actividad física (0.77)**, validando su uso como proxy de ejercicio.
+- En el ámbito demográfico, **la edad presenta correlación positiva con el IMC (0.47)** y con la calidad del sueño (0.52), pero negativa con el nivel de estrés (-0.52).
+
+En conjunto, estos resultados sugieren que la calidad y duración del sueño, junto con el manejo del estrés, son factores centrales en la salud general, mientras que los pasos diarios constituyen un buen indicador del nivel de actividad física. 
+El hallazgo de correlaciones muy altas entre ciertas variables (ej. presión arterial sistólica/diastólica o duración/calidad del sueño) indica la existencia de multicolinealidad, lo que deberá considerarse en los modelos posteriores.
+
+### Desarrollo de Algoritmos
+
+
+#### 4.2.3 Modelo de UMAP
+
+```{r}
+umap_rec <- recipe(~., data = df) %>%
+  update_role(Sleep.Disorder, new_role = "id") %>%
+  step_dummy(all_nominal_predictors()) %>%  ###Así trabajarán las categóricas
+  step_normalize(all_predictors()) %>%
+  step_umap(all_predictors())
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+umap_res <- prep(umap_rec)
+umap_res
+
+```
+
+
+```{r}
+juice(umap_res) %>%
+  ggplot(aes(UMAP1, UMAP2)) +
+  geom_point(aes(color = Sleep.Disorder), size = 1.5)+
+  labs(title = "Visualización de UMAP por Trastorno del Sueño",color = NULL)
+
+```
+
+
+El gráfico UMAP muestra que sí existen patrones latentes en los datos (sobre todo para distinguir a quienes no tienen trastorno), pero la frontera entre insomnio y apnea no es nítida, lo cual refleja la complejidad clínica del problema.
+
+
+Ahora se deja que UMAP juegue con los hiperparámetros
+>>>>>>> 065a25cdf4c875b88bd227a515606311338f9110
+
+```{r}
+umap_params = expand.grid(n_neighbors = c(10, 20, 50, 100),min_dist = c(0.1, 0.5, 0.75, 1.1))
+```
+
+Se evaluaron distintas combinaciones de parámetros principales de UMAP:
+
+- n_neighbors (vecinos): controla cuánto peso tienen las relaciones locales vs. globales.
+
+  Valores bajos (10–20): más énfasis en la estructura local → aparecen subgrupos pequeños.
+
+  Valores altos (50–100): se prioriza la estructura global → clusters grandes pero menos definidos.
+
+- min_dist: controla cuán apretados o dispersos se muestran los clusters.
+
+  Valores bajos (0.1–0.5): puntos más compactos → se distinguen mejor subgrupos.
+
+  Valores altos (0.75–1.1): los puntos se dispersan → menor definición de clusters.
+
+```{r}
+set.seed(123) 
+umaps = lapply(seq(nrow(umap_params)), function(i) {
+    emb = umap(
+      X = df[,-13], #Aca quitamos la variable respuesta, es decir los Slepp Disorder porque ocupa el lugar 13 en el df
+      n_neighbors = umap_params$n_neighbors[i],
+      min_dist  = umap_params$min_dist[i])
+
+  return(emb)
+})
+
+```
+
+
+```{r}
+d = rbindlist(lapply(seq(nrow(umap_params)), function(i) {
+  data.table(
+    x = umaps[[i]][,1],
+    y = umaps[[i]][,2],
+    n_neighbors = umap_params$n_neighbors[i],
+    min_dist = umap_params$min_dist[i],
+    group = df$Sleep.Disorder
+  )
+}))
+```
+
+
+```{r}
+library(ggforce)
+
+# 2. crea tu base de ggplot (sin facet_wrap)
+p_base <- ggplot(d) +
+  geom_scattermore(
+    aes(x = x, y = y, colour = group),
+    pointsize = 2
+  ) +
+  labs(
+    title    = "UMAP en los datos de Trastorno de Sueño",
+    subtitle = "Efecto de los hiperparámetros n_neighbors y min_dist",
+    x        = "UMAP 1",
+    y        = "UMAP 2",
+    colour   = "Trastorno del Sueño"
+  ) +
+  theme_bw() +
+  theme(
+    plot.title    = element_text(hjust = 0.5, size = 12, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, size = 10),
+    strip.text    = element_text(size = 6, face = "bold"),
+    axis.title    = element_text(size = 10),
+    axis.text     = element_blank(),
+    axis.ticks    = element_blank()
+  )
+
+# 3. calcula cuántas páginas necesitas
+#    aquí definimos bloques de 4 paneles (2x2)
+n_col   <- 2
+n_row   <- 2
+n_panels <- length(unique(interaction(d$min_dist, d$n_neighbors)))
+n_pages  <- ceiling(n_panels / (n_col * n_row))
+
+# 4. genera y muestra cada página
+for (page in seq_len(n_pages)) {
+  print(
+    p_base +
+      facet_wrap_paginate(
+        ~ min_dist + n_neighbors,
+        ncol   = n_col,
+        nrow   = n_row,
+        page   = page,
+        labeller = label_both,
+        scales   = "free"
+      )
+  )
+}
+
+
+```
+
+
+- min_dist bajo (0.1–0.5) + pocos vecinos (10–20):
+Se ven varios microgrupos → el cluster de “None” aparece más diferenciado, aunque Insomnia y Apnea se dispersan.
+
+- n_neighbors intermedio (20–50) + min_dist=0.5:
+Ofrece el mejor balance: los sujetos “None” (verde) tienden a agruparse en masa, mientras que Insomnia (rojo) y Apnea (azul) se intercalan pero con cierta separación periférica.
+
+- n_neighbors muy alto (100) o min_dist grande (0.75–1.1):
+Los clusters se diluyen → la estructura se aplana y los tres grupos se mezclan más, perdiendo capacidad de distinguir patrones.
+
+Configuración óptima para este dataset es:
+
+n_neighbors = 20–50
+
+min_dist = 0.5
+
+Racional
+
+- Mantiene la coherencia global sin perder detalle local.
+
+- Permite observar que “None” forma un cluster más cohesivo.
+
+- Muestra que Insomnia y Sleep Apnea tienden a superponerse, lo cual es realista clínicamente, pero aún así se logran ver diferencias en la periferia.
+
+## 4. Conclusión General del Proyecto
+Este proyecto se propuso evaluar la efectividad de tres técnicas de reducción de dimensionalidad —PCA, t-SNE y UMAP— para simplificar un conjunto de datos sobre salud del sueño y visualizar patrones asociados a diferentes trastornos. Tras la aplicación y el ajuste de cada método, se ha llegado a una serie de conclusiones consistentes y reveladoras.
+
+El hallazgo más significativo, confirmado por las tres técnicas, es la existencia de una estructura clara y separable dentro de los datos. Específicamente, los individuos diagnosticados con Apnea del Sueño ("Sleep Apnea") forman un conglomerado (cluster) distintivo y cohesivo, lo que indica que su perfil de características es marcadamente diferente al del resto.
+
+Sin embargo, un desafío recurrente fue la dificultad para diferenciar entre las personas sin trastornos ("None") y aquellas con Insomnio ("Insomnia"). La superposición constante entre estos dos grupos a través de los diferentes algoritmos sugiere que comparten un perfil de características muy similar en las variables analizadas, lo que representa un reto para la separación mediante métodos no supervisados.
+
+Al comparar el rendimiento de las técnicas, se observó que:
+
+PCA, como método lineal, sirvió como una línea base útil, pero fue el menos efectivo en separar las clases debido a la naturaleza no lineal de las relaciones en los datos.
+
+t-SNE demostró ser excepcionalmente bueno para visualizar la cohesión local de los clusters, pero su sensibilidad a los hiperparámetros (perplexity, eta) requirió una sintonización cuidadosa para obtener una representación estable y fiable.
+
+UMAP se destacó como el método con el mejor equilibrio entre preservar la estructura global de los datos y, al mismo tiempo, delinear los clusters locales. Ofreció visualizaciones interpretables y robustas a través de un rango razonable de sus hiperparámetros (n_neighbors, min_dist).
+
+En definitiva, el proyecto demuestra con éxito que las técnicas de reducción de dimensionalidad no solo simplifican la complejidad de los datos, sino que también actúan como una poderosa herramienta de análisis exploratorio. Los resultados validan que el conjunto 
+de datos es altamente informativo y adecuado para futuras tareas de modelado predictivo, anticipando que un modelo de clasificación podría identificar la Apnea del Sueño con alta precisión, aunque requeriría un enfoque más sofisticado para distinguir eficazmente entre la ausencia de trastornos y la presencia de insomnio.
+
+
+tanglegram()  - comparación visual
+cor.dendlist() -- comparación de correlacion basada en las distancias de Cophenetic o Baker
+
+Validación de los clusteres
+-estudio de tendencia de cluster , (realmente son distintos y se puede agrupar) assesing cluster tendency pruebas de:
+  Hopkins statistic ( analiza )
+o visual Visual Assesment of cluster Tendency
+- elección de número óptimo de clusteres (Eso es lo que más preocupa)
+- estudio de la calidad/ significancia de los clusteres generados
+¿qué tan seguros estamos que realmente los sujetos son distintos?
+
+Kmeans por ejemplo es calcular la media entre los clusteres, entonces si son distintos tiene sentido tener n cantidad de clusteres
+
+
+Número óptimo de clusteres, (solo para asignar el número como k means) . como partition clustering  con el método Elbow calcula la varianza total intracluster.  en el cual añadir más clusteres es mala idea porque aumenta la varianza
+
+con la función fviz_nbclust() paquete factoextra para varianza intracluster
+
+-Average silhouette method similar al anterior en vez de minimizar el intra cluster se maximiza el coeficiente de silueta, es que tan buena es la asignación de una observación 
+
+## HDBSCAN
+
+```{r}
+library(tidymodels)
+library(tidyverse)
+library(tidyclust)
+library(factoextra)
+library(FactoMineR)
+library(cluster)
+library(mlr)
+library(GGally)
+library(ClusterR)
+library(vegan)
+library(NbClust)
+library(gridExtra)
+library(grid)
+library(lattice)
+require(igraph)
+
+df %>% glimpse()
+```
+Se observan que los datos como Sleep.Disorder, Gender y BMI.Category estan en character, por lo que también las transformamos a factores de acuerdo a lo solicitado para DBSCAN
+
+```{r}
+df <- df %>% 
+  mutate(Sleep.Disorder  = relevel(as.factor(Sleep.Disorder ), "None","Insomnia", "Sleep Apnea"))
+
+table(df$Sleep.Disorder)
+```
+
+ 
+
+```{r}
+df$BMI.Category %>% unique()
+```
+
+También antes de transformar a factores el valor de BMI.Category, se unifican los valores de Normal Weight y de Normal a solamente Normal, con ello podremos transformar en factores mucho más fácíl.
+
+```{r}
+df <- df %>%
+  mutate(BMI.Category = recode(BMI.Category,
+                               "Normal Weight" = "Normal"))
+df <- df %>% 
+  mutate(BMI.Category = relevel(as.factor(BMI.Category ), "Normal","Overweight", "Obese"))
+
+df$BMI.Category %>% unique()
+```
+
+Se realizan las validaciones con los demás campos para ver si no ecisten datos raros o atípicos
+```{r}
+
+df$Occupation %>% unique()
+
+```
+
+```{r}
+df %>% glimpse()
+```
+Se aprecia que se transformaron los valores a factores
+
+```{r}
+df %>% summary()
+```
+
+
+Dado que tenemos una matriz mixta de variables categóricas y numéricas, se procedió a calcular la matriz de distancias de Gower, esto porque tenemos que usar daisy para transformar mis variables como BMI, 
+```{r}
+df_clean <- df %>%
+  select(-Sleep.Disorder) %>%
+  mutate(
+    Gender = as.factor(Gender),
+    Occupation = as.factor(Occupation)
+  )
+gower_dist <- daisy(df_clean, metric = "gower")
+
+
+
+```
+
+
+Ahora al graficar las distancias que se van uniendo los puntos al 5o vecino más cercano para cada observación en la matriz de distancias de gower (sin la variable predictora), detectamos las distancias son muuyyy grandes a partir de un valor muy pequeño aproximadamente 0.1 y hasta 0.6.
+
+Sin embago para no andar adivinando la cantidad de minPts se utiliza la siguiente formula
+
+$$
+\text{minPts} \approx 2 \times \text{número de variables independientes}
+$$
+
+minPts ≈ 2 × número de variables independientes
+minPts ≈ 2 × 12
+minPts = 24
+
+```{r}
+library(dbscan)
+
+# Calcular distancias k más cercanas
+kNNdistplot(gower_dist, k = 24)
+#abline(h=c(0.01,0.06),lty=2,col="red")
+
+```
+Como la verdad, es un poco arbitrario 
+
+Entonces usaré primero una técnica para calibrar k y escogerlo lo mejor posible:
+
+```{r}
+library(dbscan)
+
+# Define un vector con los k que quieres comparar
+ks <- c(6, 12, 18, 24)
+
+# Organiza la ventana gráfica para 4 paneles
+par(mfrow = c(2, 2), mar = c(4, 4, 2, 1))
+
+# Genera un kNNdistplot para cada k
+for (k in ks) {
+  kNNdistplot(gower_dist, k = k)
+  title(paste("k =", k), line = 0.5)
+}
+
+```
+
+Al momento de observar  todas las posibles combinaciones de k, al usar el k = 24 se observa un extraño comportamiento de dos escalones, por lo tanto si nos guiamos por la que tiene la menor cantidad de escalones, me guiaría por la de K = 12.
+
+Al graficarlo:
+
+```{r}
+library(dbscan)
+
+# Calcular distancias k más cercanas
+kNNdistplot(gower_dist, k = 12)
+abline(h=c(0.009,0.06),lty=2,col="red")
+
+```
+
+
+Por lo tanto calibraremos la eps_value, 
+```{r}
+eps_values <- c(0.05, 0.09, 0.06, 0.07,0.8,0.9,0.1, 0.12, 0.13,0.15,0.2, 0.25)
+results <- lapply(eps_values, function(eps) {
+  model <- dbscan(gower_dist, eps = eps, minPts = 12)
+  data.frame(
+    eps = eps,
+    clusters = length(unique(model$cluster[model$cluster != 0])),
+    noise_points = sum(model$cluster == 0)
+  )
+})
+
+summary_df <- do.call(rbind, results)
+print(summary_df)
+
+```
+
+Otra forma de validarlo es con quantiles:
+
+```{r}
+quantile(kNNdist(gower_dist, k = 12), c(0.7, 0.75, 0.8, 0.9, 0.95, 0.99, 0.995, 0.999))
+```
+
+Ok, entonces utilizando lo anterior conforme a los cuantiles la gráfica quedaría de esta forma
+
+
+```{r}
+# Calcular distancias k más cercanas
+kNNdistplot(gower_dist, k = 12)
+abline(h=c(0.005690586,0.237340443, 0.415189594 ),lty=3,col="red")
+
+```
+
+Y si tomamos el cuantil 95 % 
+
+```{r}
+eps_values <- c(0.05, 0.09, 0.06, 0.07,0.8,0.9,0.1, 0.12, 0.13,0.15,0.2, 0.237340443, 0.25)
+results <- lapply(eps_values, function(eps) {
+  model <- dbscan(gower_dist, eps = eps, minPts = 12)
+  data.frame(
+    eps = eps,
+    clusters = length(unique(model$cluster[model$cluster != 0])),
+    noise_points = sum(model$cluster == 0)
+  )
+})
+
+summary_df <- do.call(rbind, results)
+print(summary_df)
+
+```
+
+Con el quantil 95% tendremos 3 clusters con 9 puntos de ruido y 3 clusteres.Por lo tanto se procederá a utilizar los siguientes parámetros:
+
+**k = 12 y eps = 0.237340443**
+
+
+```{r}
+df_clus <- dbscan(gower_dist, eps =0.237340443 , minPts = 12)
+#DBSCAN DETERMINA DE MANERA PROPIA LA CANTIDAD DE GRUPOS SIN QUE LE PROPORCIONEMOS
+df_clus 
+```
+
+Por lo tanto al momento de utilizar el modelo, vemos que efectivamente hizo 3 clusteres y el cluter 0 o "ruido" tenemos 9 observaciones
+
+```{r}
+names(df_clus)
+
+df_db <- gower_dist %>%
+    dbscan(eps = 0.237340443, minPts = 12)
+
+tidy(df_db)
+
+library(umap)
+
+# Proyecta los datos originales (no la matriz de distancias)
+
+df_clean <- df %>% select(-Sleep.Disorder) %>% mutate( Gender = as.factor(Gender), Occupation = as.factor(Occupation), BMI.Category = as.factor(BMI.Category) )
+
+
+
+
+
+df_umap_input <- model.matrix(~ . -1, data = df_clean)
+
+library(umap)
+umap_proj <- umap(df_umap_input,
+                  n_neighbors = 30,     # Se escoge un punto "mediano" entre 20 y 50
+                  min_dist = 0.5,       # controla la dispersión
+                  n_components = 2,     # para visualización en 2D
+                  metric = "euclidean") # Gower no está soportado directamente aquí
+
+
+df_umap <- as.data.frame(umap_proj$layout) 
+colnames(df_umap) <- c("x", "y")
+
+
+df_umap$Sleep.Disorder <- df$Sleep.Disorder
+
+ggplot(df_umap, aes(x = x, y = y)) +
+geom_point(aes(color = Sleep.Disorder), size = 2, alpha = 0.8) +
+labs(title = "Proyección UMAP coloreada por Sleep.Disorder",
+    x = "UMAP 1", y = "UMAP 2", color = "Trastorno del sueño") +
+theme_minimal(base_size = 14)
+
+```
+```{r}
+df_umap$cluster <- factor(df_db$cluster)
+df_umap$noise <- ifelse(df_db$cluster == 0, TRUE, FALSE)
+
+ggplot(df_umap, aes(x = x, y = y)) +
+  geom_point(aes(color = Sleep.Disorder, shape = cluster),
+             size = 3, alpha = 0.9, stroke = 0.3) +  # puntos más grandes y definidos
+  labs(
+    title = "Sleep.Disorder vs Clusters DBSCAN en UMAP",
+    subtitle = "Proyección no supervisada con agrupamiento DBSCAN",
+    x = "UMAP 1", y = "UMAP 2",
+    color = "Trastorno del sueño", shape = "Cluster"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "bottom",                # leyenda abajo
+    legend.box = "horizontal",                 # leyenda en línea
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12, margin = margin(b = 10)),
+    axis.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank()         # limpia el fondo
+  ) +
+  
+  geom_point(data = subset(df_umap, noise == TRUE),
+           aes(x = x, y = y),
+           shape = 4, color = "black", size = 3, stroke = 1)
+
+
+
+```
+
+En esta gráfica con el método de UMAP que se escogió al princiío claramente el grupo 3 son el grupo de la apnea junto con el grupo 2, que es el grupo más crítico, sin embargo para el grupo de la insomnia no se alcanza a ver los de Insomnia, ya que están en el grupo 1 con los que tienen None y los que también tienen Insomnial Cluster podría ayudarnos a encontrar los casos más preocupantes en todo caso de los de Apnea del sueño. Con la siguiente tabla de frecuencias comprobaremos lo escrito anteriormente
+
+
+```{r}
+# Tabla de frecuencias absolutas
+tabla_cruzada <- table(df_umap$cluster, df_umap$Sleep.Disorder)
+#tabla_cruzada
+porcentajes <- prop.table(tabla_cruzada, margin = 1) * 100
+#round(porcentajes, 1)
+
+library(janitor)
+
+tabla_bonita <- df_umap %>%
+  tabyl(cluster, Sleep.Disorder) %>%
+  adorn_totals("row") %>%
+  adorn_percentages("row") %>%
+  adorn_pct_formatting(digits = 1) %>%
+  adorn_ns(position = "front") %>%
+  adorn_title("combined")
+
+library(knitr)
+library(kableExtra)
+
+tabla_bonita %>%
+  kable(format = "html", caption = "Distribución de Sleep.Disorder por cluster DBSCAN") %>%   # cambiar a "latex" en caso de ser pdf
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+                full_width = FALSE,
+                position = "center")
+
+
+```
+
+Nuestras conclusiones son:
+ + Cluster 1: Dominado por personas sin trasnstorno y por el grupo con algo de insomnia
+ + Cluster 2 y 3 está dominado por Sleep Apnea con un más del 90 por ciento. Esto nos revela que DBSCAN logró identificar patrones fisiolóigios o de estilo de vida asociado a la apnea
+ + Ruido o grupo O: Aunque tiene 9 observaciones, 5 es de Apnea que representa el 7.35% del total de apnea (es decir el 92.65 % de los pacientes son identificados correctamente) y 4 de Insomnia ( es el 5% del grupo de Insomnia), eso quiere decir que son perfiles atípicos o con datos menos densos o incluso probable error de captura o falsedad de datos.
+
+Por lo tanto le atina en un 90 % a los que tienen apnea del sueño en los clusteres 2 y 3, y para el cluster 1 a los que tienen None, sin embargo, se nota que se confunde en este grupo, como si fueran los que menos te preocuparan, clínicamente puede ser que sea el mejor
+
+## HDBSCAN
+
+Susy ya lo hizo :'(
+
+
+
+
+
+
+
+
+
+
