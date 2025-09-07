@@ -1,5 +1,5 @@
 ---
-title: "Proecto-Parte 2 "
+title: "Proyecto- Módulo 6 - Parte 2 "
 author: "Equipo 6"
 date: "2025-09-04"
 output:
@@ -1612,6 +1612,7 @@ Cuando cruzamos los resultados de cada Clústeres versus la etiqueta de Sueño, 
 
 Descartamos CLARA y Optics ya que no son extremosos los resultados, es decir, generan doce o un solo grupo.
 Por lo tanto, es necesario discutir con un experto de área los resultados para seleccionar el modelo que tenga una mejo contextualización
+
 
 
 
