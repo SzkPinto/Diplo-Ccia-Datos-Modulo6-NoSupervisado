@@ -1614,10 +1614,13 @@ cat(paste0("- ", concs, collapse = "\n"))
 # Conclusiones generales 
 
 En general los algoritmos generan una recomendación entre tres y cuatro grupos; K Means y k Medoids recomiendan cuatro, DBSCAN y HDBSCAN recomiendan tres.
-Cuando cruzamos los resultados de cada Clústeres versus la etiqueta de Sueño, en general encontramos mezclas; en el caso de k-Means segmenta adecuadamente los pacientes sin padecimientos, pero lo que tienen algún padecimiento los mezcla, por lo que bajo este método podríamos concluir dos grupos con padecimiento y sin padecimiento.
-K Medois:
-DBSCAN:
-HDBSCAN:
+Cuando cruzamos los resultados de cada Clústeres versus la etiqueta de Sueño, en general encontramos mezclas; en el caso de:
+
+## k-Means segmenta adecuadamente los pacientes sin padecimientos, pero lo que tienen algún padecimiento los mezcla, por lo que bajo este método podríamos concluir dos grupos con padecimiento y sin padecimiento.
+## K Medois:
+## DBSCAN:
+## HDBSCAN:
+
 Descartamos CLARA y Optics ya que no son extremosos los resultados, es decir, generan doce o un solo grupo.
 Por lo tanto, es necesario discutir con un experto de área los resultados para seleccionar el modelo que tenga una mejo contextualización
 
