@@ -1,0 +1,627 @@
+---
+title: "K-Means, proceso 1.3.2"
+author: "David Ruiz"
+date: "2025-09-04"
+output:
+  word_document: default
+  html_document: default
+---
+
+Activación librerías
+```{r, message=FALSE, warning=FALSE}
+source('R-libraries-ICdD.r')
+```
+
+Importación la información
+```{r, message=FALSE, warning=FALSE}
+df<- read_csv("Sleep_health_and_lifestyle.csv") %>% data.frame()
+```
+
+La variable Blood Preassure se debe ajustar porque es una medida cuantitativa que se cargó como carácter. Hagamos la separación de los registros como: Sistólica y Diastólica para incluirla de manera adecuada en la reducción de Dimensionalidad y verifiquemos que hizo adecuadamente la separación
+
+```{r}
+df <- df %>%
+  separate(Blood.Pressure, into = c("sistolica_bp", "diastolica_bp"), sep = "/", convert = TRUE)
+df |> head()
+```
+
+Camino 1.3.1
+
+Separación de Variables
+
+```{r}
+base_recipe <- 
+  recipe(Sleep.Disorder ~ ., data = df) %>%
+  step_dummy(all_nominal_predictors()) %>%      # Variables categóricas a dummies
+  step_normalize(all_numeric_predictors()) #%>%  # Escalar/normalizar y centrar numéricas
+```
+
+```{r}
+prepped_data <- prep(base_recipe) %>% bake(new_data = NULL)
+```
+
+
+```{r}
+df_C132=prepped_data %>% select(-Sleep.Disorder)
+
+dim(df_C132)
+head(df_C132)
+
+```
+
+1. Exploracion del numero de grupos (kMedias)
+
+```{r, message=FALSE, warning=FALSE}
+ggpairs(df_C132[,1:9],
+        progress = FALSE,
+upper = list(continuous = "density"),
+lower = list(continuous = wrap("points", size = 0.5)),
+diag = list(continuous = "densityDiag")) +
+theme_bw()
+
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+set.seed(1234)
+
+dfTask <- makeClusterTask(data = df_C132)
+listLearners("cluster")$class
+
+kMeans <- makeLearner("cluster.kmeans",par.vals = list(iter.max = 1000, nstart = 38)) #nstart tomo el 10% del tamaño de las observaciones
+kMeans
+```
+
+Declaración de proceso
+```{r}
+
+kMeansParamSpace <- makeParamSet(
+makeDiscreteParam("centers", values = 2:10), #Consideremos máximo 8 grupos (2x4). Que es lo que veo 
+makeDiscreteParam("algorithm",
+values = c("Hartigan-Wong", "Lloyd", "MacQueen")))
+gridSearch <- makeTuneControlGrid()
+kFold <- makeResampleDesc("CV", iters = 20)
+```
+
+```{r, message=FALSE, warning=FALSE}
+set.seed(123)
+tunedK <- tuneParams(kMeans, task = dfTask,
+resampling = kFold,
+par.set = kMeansParamSpace,
+control = gridSearch,
+measures = list(db, G1))
+# debemos buscar el min db.test
+tunedK
+```
+
+```{r}
+set.seed(1237)
+
+kMeansTuningData <- generateHyperParsEffectData(tunedK)
+kMeansTuningData$data
+gatheredTuningData <- gather(kMeansTuningData$data,
+key = "Metric",
+value = "Value",
+c(-centers, -iteration, -algorithm))
+
+ggplot(gatheredTuningData, aes(centers, Value, col = algorithm)) +
+facet_wrap(~ Metric, scales = "free_y") +
+geom_line() +
+geom_point() +
+theme_bw()
+```
+
+No existe como tal un mínimo, conforme incrementas el número de Clusters, baja el estadístico db, mientras que en los otros dos indicadores no hay un máximo com otal en ningún algoritmo, solo con excepción de MacQueen en G1 aquí si se logra marcar un máximo en con 9 centros. 
+
+La recomendación de este método es tener 10 Grupos ¿qué pasa si le hacemos caso?
+```{r}
+set.seed(1237)
+
+tunedKMeans <- setHyperPars(kMeans, par.vals = tunedK$x)
+tunedKMeansModel <- train(tunedKMeans, dfTask)
+kMeansModelData <- getLearnerModel(tunedKMeansModel)
+kMeansModelData$iter
+
+tunedKMeans
+```
+
+```{r}
+df_C132_1 <- mutate(df_C132,
+kMeansCluster = as.factor(kMeansModelData$cluster))
+
+df_C132_1=mutate(df_C132_1,
+Sleep.Disorder = as.factor(df$Sleep.Disorder))
+
+head(df_C132_1)
+
+```
+
+```{r}
+table(df_C132_1$kMeansCluster)
+table(df_C132_1$Sleep.Disorder)
+```
+
+Por lo tanto, hacerle caso al método de aplicar 10 grupos pulveriza la información cuándo se compara con los grupos de la variable respuesta que teníamos en la información original; posiblemente los grupos 1,2,3 podrían asociarse a las observaciones con individuos con Insomia o Apnea. 
+
+Los que no se ve en ningún lado, son aquellos individuos que no sufren algún padecimiento, este grupo podría estar contaminando el resto de la información al poder contener más grupo o ninguno. 
+
+Con este método no tenemos conclusión
+
+###Otra forma de explorar (kMeans)
+
+Tomaremos la base previamente armada, solamente para evitar hacer ajustes en el código hacemos este recipe dummy para mantener el mismo nombre
+
+```{r, message=FALSE, warning=FALSE}
+ rec_df  <- recipe(~., data = df_C132)
+
+
+ #rec_df <- recipe( ~ ., data = df) %>%
+  # update_role(Sleep.Disorder,new_role = 'id') %>%
+  #step_dummy(all_nominal_predictors()) %>%      # Variables categóricas a dummies
+  #step_normalize(all_numeric_predictors())
+rec_df
+```
+
+Preparación de la Data
+
+```{r}
+prepped_data <- prep(rec_df) %>% bake(new_data = NULL)
+```
+
+```{r}
+dim(prepped_data)
+df1=prepped_data
+
+```
+
+Se realiza la corrida del ajuste hasta con 12 clusters con objetivo de validar si no hay un tope en los Clusters que puedes formar con la información actual
+
+```{r}
+kmeans_spec <- k_means(num_clusters = tune())
+
+kmeans_wf <- workflow(rec_df, kmeans_spec)
+
+kmeans_wf <- kmeans_wf %>% 
+  update_model(kmeans_spec)
+
+grid <- tibble(num_clusters = 1:12)
+
+```
+
+```{r}
+set.seed(123)
+boots <- bootstraps(df1, times = 12)
+
+res <- tune_cluster(
+  kmeans_wf,
+  resamples = boots,
+  grid = grid,
+  metrics = cluster_metric_set(sse_within_total, sse_total, sse_ratio)
+)
+
+res_metrics <- collect_metrics(res)%>% print(n=Inf)
+
+```
+
+
+```{r}
+res_metrics %>%
+  filter(.metric == "sse_ratio") %>%
+  ggplot(aes(x = num_clusters, y = mean)) +
+  geom_point(col="darkblue",size=2) +
+  geom_line(col="red") +
+  theme_minimal() +
+  ylab("mean WSS/TSS ratio") +
+  xlab("Número de clusters") +
+  scale_x_continuous(breaks = 1:12)
+
+```
+
+De acuerdo a encontrar un SSE_Ratio bajo o que el decremento sea mínimo es con 12 Grupos, con 10 Clustres tambipen se ve una convergencia, pero vuelve a decrecer con 11; en número previo de grupos si se ve que decrece en "picada"
+
+### Validacion cruzada
+
+```{r}
+
+df_cv <- vfold_cv(df1, v = 12) # lo divide en 10 segmentos (o "folds") 
+
+clust_num_grid <- grid_regular(num_clusters(),levels = 12)
+
+#clust_num_grid
+
+res1 <- tune_cluster(
+  kmeans_wf,
+  resamples = df_cv,
+  grid = clust_num_grid,
+  control = control_grid(save_pred = TRUE, extract = identity),
+  metrics = cluster_metric_set(sse_within_total, sse_total, sse_ratio)
+)
+```
+
+```{r}
+res1_metrics <- res1 %>% collect_metrics()%>% print(n=Inf)
+```
+
+```{r}
+res1_metrics %>%
+  filter(.metric == "sse_ratio") %>%
+  ggplot(aes(x = num_clusters, y = mean)) +
+  geom_point(col="darkblue",size=2) +
+  geom_line(col="red") +
+  theme_minimal() +
+  ylab("mean WSS/TSS ratio cv") +
+  xlab("Number of clusters") +
+  scale_x_continuous(breaks = 1:12)
+```
+
+Aún con validación cruzada tenemos una caída acelerada del sse_ratio, no podemos concluir. 
+
+```{r}
+fviz_nbclust(df1, kmeans, method = "wss")+labs(x ="Número de clusters")+labs(y="Total suma de cuadrados intra clusters")+labs(title = "Número óptimo de clusters")
+
+opt<-Optimal_Clusters_KMeans(df1, max_clusters=12,plot_clusters = TRUE,criterion="WCSSE")
+
+fviz_nbclust(df1, kmeans, method = "silhouette")+labs(x ="Número de clusters")+labs(y="Promedio de silueta")+labs(title = "Número óptimo de clusters")
+
+opt1<-Optimal_Clusters_KMeans(df1, max_clusters=12, plot_clusters = TRUE, criterion="silhouette")
+
+opt2<-Optimal_Clusters_KMeans(df1, max_clusters=12, plot_clusters = TRUE, criterion = "variance_explained",fK_threshold = 0.90)
+
+fviz_nbclust(df1, kmeans, method = "gap_stat")+labs(x ="Número de clusters")+labs(y="GAP")+labs(title = "Número óptimo de clusters")
+```
+
+Sigue habiendo decrementos agresivos, sin embargo sucede entre la formación de 4-6 grupos ya que en ese rango se estabiliza los errores, sin embargo el promedio de Silueta recomienda 10 clusters... GAP dice que 1. No hay suficiente claridad
+
+
+
+```{r}
+fit <- cascadeKM(df1, 2, 12, iter = 500)
+plot(fit, sortg = TRUE, grpmts.plot = TRUE)
+
+opt_aic<-Optimal_Clusters_KMeans(df1, 12, 'euclidean', plot_clusters=TRUE,criterion="AIC")
+
+nb <- NbClust(df1[,1:9], distance = "euclidean", min.nc = 2, max.nc = 12, method = "single", index ="all")
+
+names(nb) 
+
+```
+
+Las Cascada y AIC recomienda 12 clusters
+
+De acuerdo al método NB Clus, hay 11 propuestas con 4 Clusters, por lo tanto la recomendación es tener 4 Clusters
+
+
+Si bien, la recomendación es tener 4 Clusters, exploremos como se ve con 2 y 3 con la intención de comparar la recomendación con la realidad y considerando 
+
+```{r}
+k2 <- kmeans(df1, centers = 2, nstart = 25)
+k3 <- kmeans(df1, centers = 3, nstart = 25)
+k4 <- kmeans(df1, centers = 4, nstart = 25)
+
+```
+
+```{r}
+k2$tot.withinss/k2$totss; k3$tot.withinss/k3$totss; k4$tot.withinss/k4$totss
+
+p2 <- fviz_cluster(k2, geom = "point", data = df1)+ ggtitle("k = 2")
+p3 <- fviz_cluster(k3, geom = "point",  data = df1) + ggtitle("k = 3")
+p4 <- fviz_cluster(k4, geom = "point",  data = df1) + ggtitle("k = 4")
+
+
+
+grid.arrange(p2, p3, p4,nrow=2, ncol = 2)
+```
+
+```{r}
+fviz_cluster(k2, geom = "point",  data = df1) + ggtitle("Número de grupos de pacientes: 2")
+
+fviz_cluster(k2, data = df1,
+             palette=c("deeppink3", "magenta3"),
+             ellipse.type = "euclid",
+             star.plot = T,
+             repel = T,
+             ggtheme = theme())+ ggtitle("Número de grupos de pacientes: 2")
+
+
+require(tibble)
+```
+
+```{r}
+fviz_cluster(k3, geom = "point",  data = df1) + ggtitle("Número de grupos de pacientes: 3")
+
+fviz_cluster(k3, data = df1,
+             palette=c("deeppink3", "magenta3", "royalblue3"),
+             ellipse.type = "euclid",
+             star.plot = T,
+             repel = T,
+             ggtheme = theme())+ ggtitle("Número de grupos de pacientes: 3")
+
+
+require(tibble)
+```
+
+```{r}
+fviz_cluster(k4, geom = "point",  data = df1) + ggtitle("Número de grupos de pacientes: 4")
+
+fviz_cluster(k4, data = df1,
+             palette=c("deeppink3", "magenta3", "royalblue3", "black"),
+             ellipse.type = "euclid",
+             star.plot = T,
+             repel = T,
+             ggtheme = theme())+ ggtitle("Número de grupos de pacientes: 4")
+
+
+require(tibble)
+```
+
+```{r}
+k2 %>%
+  extract_centroids()%>% as_tibble() %>% print(width=Inf)
+
+kmeans_clusters2 <- 
+  bind_cols(df1, cluster=k2$cluster)
+
+kmeans_clusters2 %>%
+  pivot_longer(-cluster) %>% 
+  ggplot(aes(x = as.factor(cluster), y = value, fill = as.factor(cluster))) +
+  geom_boxplot(show.legend = FALSE) +
+  facet_wrap(vars(name), scales = "free") 
+
+kmeans_clusters2 %>% 
+  group_by(cluster) %>% 
+  summarise(num_users = n()) %>% 
+  mutate(pct_users = num_users / sum(num_users))
+```
+
+```{r}
+table(df$Sleep.Disorder)
+table(kmeans_clusters2$cluster)
+
+cluster_assignments2= cbind(kmeans_clusters2$cluster,df$Sleep.Disorder) %>% data.frame()
+
+colnames(cluster_assignments2)=c('Cluster','Sleep.Disorder')
+
+summary_plot <- ggplot(cluster_assignments2, aes(x = Cluster, fill = Sleep.Disorder)) +
+  geom_bar(position = "fill") +
+  labs(
+    title = "Distribución de Trastornos del Sueño por Cluster",
+    x = "Cluster",
+    y = "Proporción",
+    fill = "Trastorno del Sueño"
+  ) +
+  coord_flip() +
+  theme_minimal()
+
+print(summary_plot)
+
+```
+El grupo 2 se asocia con el grupo None, pero el grupo 1 tiene una mezcla de Insomnia y Disociación de sueño; podríamos decir que son personas con algún padecimiento y sin padecimiento.
+
+```{r}
+k3 %>%
+  extract_centroids()%>% as_tibble() %>% print(width=Inf)
+
+kmeans_clusters3 <- 
+  bind_cols(df1, cluster=k3$cluster)
+
+kmeans_clusters3 %>%
+  pivot_longer(-cluster) %>% 
+  ggplot(aes(x = as.factor(cluster), y = value, fill = as.factor(cluster))) +
+  geom_boxplot(show.legend = FALSE) +
+  facet_wrap(vars(name), scales = "free") 
+
+kmeans_clusters3 %>% 
+  group_by(cluster) %>% 
+  summarise(num_users = n()) %>% 
+  mutate(pct_users = num_users / sum(num_users))
+
+```
+
+```{r}
+table(df$Sleep.Disorder)
+table(kmeans_clusters3$cluster)
+
+cluster_assignments3= cbind(kmeans_clusters3$cluster,df$Sleep.Disorder) %>% data.frame()
+
+colnames(cluster_assignments3)=c('Cluster','Sleep.Disorder')
+
+summary_plot <- ggplot(cluster_assignments3, aes(x = Cluster, fill = Sleep.Disorder)) +
+  geom_bar(position = "fill") +
+  labs(
+    title = "Distribución de Trastornos del Sueño por Cluster",
+    x = "Cluster",
+    y = "Proporción",
+    fill = "Trastorno del Sueño"
+  ) +
+  coord_flip() +
+  theme_minimal()
+
+print(summary_plot)
+
+```
+
+Con tres grupos, la mezcla del grupo 1 se mantiene con una merma en padecimiento de Insomio, pero los que no tienen padecimiento se separan en dos grupos
+
+```{r}
+k4 %>%
+  extract_centroids()%>% as_tibble() %>% print(width=Inf)
+
+kmeans_clusters4 <- 
+  bind_cols(df1, cluster=k4$cluster)
+
+kmeans_clusters4 %>%
+  pivot_longer(-cluster) %>% 
+  ggplot(aes(x = as.factor(cluster), y = value, fill = as.factor(cluster))) +
+  geom_boxplot(show.legend = FALSE) +
+  facet_wrap(vars(name), scales = "free") 
+
+kmeans_clusters4 %>% 
+  group_by(cluster) %>% 
+  summarise(num_users = n()) %>% 
+  mutate(pct_users = num_users / sum(num_users))
+
+
+```
+
+```{r}
+table(df$Sleep.Disorder)
+table(kmeans_clusters4$cluster)
+
+cluster_assignments4= cbind(kmeans_clusters4$cluster,df$Sleep.Disorder) %>% data.frame()
+
+colnames(cluster_assignments4)=c('Cluster','Sleep.Disorder')
+
+summary_plot <- ggplot(cluster_assignments4, aes(x = Cluster, fill = Sleep.Disorder)) +
+  geom_bar(position = "fill") +
+  labs(
+    title = "Distribución de Trastornos del Sueño por Cluster",
+    x = "Cluster",
+    y = "Proporción",
+    fill = "Trastorno del Sueño"
+  ) +
+  coord_flip() +
+  theme_minimal()
+
+print(summary_plot)
+
+```
+
+Con los datos proporcionados no hay similitudes para determinar si puede padecer algún transtorno ya que a medida que vamos separando la información los pacientes con algún pedecimiento se separan, lo que tratan de mantenerse son los que no tienen padecimiento. 
+
+
+## Ajustan PCA y reconstruyendo
+
+Ponemos en recipe que sea al menos 80% de la varianza explicada como criterio del número Componentes
+
+```{r}
+df_pca_rec <- recipe(~ ., data = df) %>%
+  update_role(Sleep.Disorder, new_role = "id") %>%
+  step_dummy(all_nominal_predictors()) %>% 
+  step_normalize(all_predictors()) %>%
+  step_pca(all_predictors(), threshold = 0.80)
+
+df_pca_wf <- workflow() %>%
+  add_recipe(df_pca_rec)
+
+df_pca_hier <- df_pca_wf %>%
+  add_model(hier_clust(linkage_method = "ward.D")) %>%
+  fit(data = df) %>%
+  extract_fit_engine() %>%
+  plot()
+
+df_pca_hier <- df_pca_wf %>%
+  add_model(hier_clust(linkage_method = "ward.D2")) %>%
+  fit(data = df) %>%
+  extract_fit_engine() %>%
+  plot()
+
+df_pca_hier <- df_pca_wf %>%
+  add_model(hier_clust(linkage_method = "ward.D")) %>%
+  fit(data = df) %>%
+  extract_fit_engine() %>%
+  fviz_dend(k = 3, main = "Dendograma basado en PCA: Liga Ward")%>%
+  plot()
+```
+
+Con el dendograma indica que efectivamente debemos quedarnos con **tres grupos**
+
+kMeans con tres grupos de acuerdo a la recomendación del Dendograma
+
+```{r}
+pca_df <-
+  recipe(~ . , data = df) %>% 
+  update_role(Sleep.Disorder, new_role = "id") %>%
+  step_dummy(all_nominal_predictors()) %>% 
+  step_normalize(all_predictors()) %>%
+  step_pca(all_predictors(), threshold = 0.80) %>% 
+  prep(df) %>%
+  bake(df)
+
+pca_clusters2 <- 
+  bind_cols(pca_df, cluster=k3$cluster)
+
+g2<-ggplot(pca_clusters2, aes(x = PC1, y = PC2, color = as.factor(cluster))) + 
+  geom_point(alpha = 0.8, show.legend = TRUE)
+
+g2
+```
+
+Al parecer con una reducción de dimensiones si existe una clara serpación de la información, solo recordar que este gráfico está construido solo con dos Componenete y estas explican el 38% de la variabilidad de acuerdo al ejercicio PCA entregado previamente
+
+Creemos UMAP para gráficar. Los hiperparámetros que tomaremos son: neighbors=50 y min_dis=0.5 que fueron la conclusión del ejericio anterior
+
+```{r}
+# Declaro Recipe
+
+umap_rec <- recipe(~., data = df) %>%
+  update_role(Sleep.Disorder, new_role = "id") %>%
+  step_dummy(all_nominal_predictors()) %>%  ###Así trabajarán las categóricas
+  step_normalize(all_predictors()) %>%
+  step_umap(
+    all_predictors(), 
+    neighbors = 50,       # <-- Número de vecinos
+    min_dist = 0.5,         # <-- Distancia mínima
+    num_comp = 2            # <-- Número de componentes a generar (opcional, por defecto es 2)
+            )
+
+umap_res <- prep(umap_rec)
+
+umap_res=juice(umap_res)
+
+umap_res2 = umap_res %>% mutate(Cluster2 = as.factor(kmeans_clusters2$cluster))
+
+umap_res2%>%
+  ggplot(aes(UMAP1, UMAP2)) +
+  geom_point(aes(color = Cluster2), size = 1.5)+
+  labs(title = "Visualización de UMAP por Trastorno del Sueño")
+
+umap_res3 = umap_res %>% mutate(Cluster3 = as.factor(kmeans_clusters3$cluster))
+
+umap_res3%>%
+  ggplot(aes(UMAP1, UMAP2)) +
+  geom_point(aes(color = Cluster3), size = 1.5)+
+  labs(title = "Visualización de UMAP por Trastorno del Sueño")
+
+umap_res4 = umap_res %>% mutate(Cluster4 = as.factor(kmeans_clusters4$cluster))
+
+umap_res4%>%
+  ggplot(aes(UMAP1, UMAP2)) +
+  geom_point(aes(color = Cluster4), size = 1.5)+
+  labs(title = "Visualización de UMAP por Trastorno del Sueño")
+
+```
+
+Al parece con UMAP releva porque algunas veces busca varios clusters ya que al ir migrando a una estructura más local hay características de la información que creará grupos con mayor particularidad. 
+
+Profundizar con está investigación, podría revelar padecimientos peculiares
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

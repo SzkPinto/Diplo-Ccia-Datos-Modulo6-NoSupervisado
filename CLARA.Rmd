@@ -1,0 +1,144 @@
+---
+title: "CLARA"
+author: "Lalo Reyes"
+date: "2025-09-07"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r}
+# Librerías
+library(tidyverse)
+library(tidymodels)
+library(cluster)      
+library(factoextra)
+library(patchwork)  
+```
+
+
+```{r}
+df <- read.csv("/Users/eduardoreyes/Downloads/Sleep_health_and_lifestyle.csv", header = TRUE, sep = ",")
+```
+
+
+```{r}
+# Ajuste de Blood Pressure
+df <- df %>%
+  separate(Blood.Pressure,
+           into = c("sistolica_bp", "diastolica_bp"),
+           sep = "/", convert = TRUE)
+
+# Preparar recipe
+base_recipe <- recipe(Sleep.Disorder ~ ., data = df) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_normalize(all_numeric_predictors())
+
+prepped_data <- prep(base_recipe) %>% bake(new_data = NULL)
+df_clara <- prepped_data %>% select(-Sleep.Disorder)
+
+```
+
+Selección del número de clusters con Silhouette
+
+```{r}
+set.seed(123)
+res_clara <- list()
+for (k in 2:12) {
+  res_clara[[k]] <- clara(df_clara, k, metric = "euclidean", samples = 50)
+}
+
+avg_sil <- sapply(2:12, function(k) {
+  sil <- silhouette(res_clara[[k]]$clustering, dist(df_clara))
+  mean(sil[, 3])
+})
+
+sil_table <- tibble(
+  k = 2:12,
+  avg_silhouette = round(avg_sil, 4)
+)
+print(sil_table)
+
+plot(2:12, avg_sil, type = "b", pch = 19,
+     xlab = "Número de clusters (k)",
+     ylab = "Promedio de Silhouette",
+     main = "Selección de k con CLARA (Silhouette)")
+```
+De acuerdo con el índice Silhouette, los valores van mejorando conforme aumenta 
+k.
+El mayor valor se obtuvo en k = 12, lo cual sugiere que la partición en 12 clusters maximiza la cohesión y separación entre los grupos.
+
+Ahora probaremos con GAP.
+
+```{r}
+set.seed(123)
+gap_clara <- clusGap(
+  df_clara,
+  FUN = clara,
+  K.max = 12,
+  B = 50,
+  metric = "euclidean",
+  samples = 50
+)
+
+print(gap_clara, method = "firstmax")
+fviz_gap_stat(gap_clara) +
+  ggtitle("Número óptimo de clusters con Gap Statistic (CLARA)")
+
+best_k_gap <- maxSE(gap_clara$Tab[,"gap"], gap_clara$Tab[,"SE.sim"], method="firstSEmax")
+cat("Mejor número de clusters según GAP:", best_k_gap, "\n")
+
+```
+
+A diferencia de Silhouette con GAP vemos que el número óptimo de clusters es k = 1.
+Esto implica que, bajo este criterio, los datos no presentan una estructura clara de agrupamiento, ya que el modelo “sin clusters” (un solo grupo) resulta más adecuado.
+
+Porcedemos a visualizar ambos criterios
+
+```{r}
+# Ajuste con Silhouette
+final_clara_sil <- clara(df_clara, 12, metric = "euclidean", samples = 50)
+
+fviz_cluster(final_clara_sil, data = df_clara) +
+  ggtitle("CLARA con 12 clusters (criterio: Silhouette)")
+
+# Ajuste con GAP (k=1 no genera partición, solo para referencia)
+final_clara_gap <- clara(df_clara, 1, metric = "euclidean", samples = 50)
+
+fviz_cluster(final_clara_gap, data = df_clara) +
+  ggtitle("CLARA con 1 cluster (criterio: GAP)")
+
+```
+Con k=12 (Silhouette) observamos una partición más detallada de los datos, donde se forman subgrupos pequeños.
+Con k=1 (GAP), todos los puntos son considerados parte de un único grupo, lo cual refuerza la conclusión de que los datos podrían no tener una estructura de clustering fuerte.
+
+```{r}
+set.seed(123)
+umap_coords <- umap(as.matrix(df_clara), n_neighbors = 30, min_dist = 0.1, n_components = 2)
+
+umap_df <- as.data.frame(umap_coords)
+colnames(umap_df) <- c("UMAP1", "UMAP2")
+umap_df$Cluster_sil <- factor(final_clara_sil$clustering)
+umap_df$Cluster_gap <- factor(final_clara_gap$clustering)
+umap_df$Sleep.Disorder <- df$Sleep.Disorder
+
+# Gráfico con Silhouette
+ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = Cluster_sil)) +
+  geom_point(size = 2, alpha = 0.8) +
+  geom_mark_ellipse(aes(fill = Cluster_sil), alpha = 0.1, show.legend = FALSE) +
+  theme_minimal() +
+  labs(title = "CLARA con 12 clusters (Silhouette)") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# Gráfico con GAP
+ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = Cluster_gap)) +
+  geom_point(size = 2, alpha = 0.8) +
+  geom_mark_ellipse(aes(fill = Cluster_gap), alpha = 0.1, show.legend = FALSE) +
+  theme_minimal() +
+  labs(title = "CLARA con 1 cluster (GAP)") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+El índice Silhouette sugiere una partición compleja en 12 clusters mientras que el GAP recomienda un único cluster, lo que indica que la estructura de los datos no es lo suficientemente robusta para confirmar agrupamientos claros, por lo que conviene probar otros métodos de clustering antes de tomar una decisión.
+
