@@ -987,12 +987,54 @@ tabla_bonita %>%
 
 ```
 
-Nuestras conclusiones son:
+**Nuestras conclusiones en DBSCAN son**:
  + Cluster 1: Dominado por personas sin trasnstorno y por el grupo con algo de insomnia
  + Cluster 2 y 3 está dominado por Sleep Apnea con un más del 90 por ciento. Esto nos revela que DBSCAN logró identificar patrones fisiolóigios o de estilo de vida asociado a la apnea
  + Ruido o grupo O: Aunque tiene 9 observaciones, 5 es de Apnea que representa el 7.35% del total de apnea (es decir el 92.65 % de los pacientes son identificados correctamente) y 4 de Insomnia ( es el 5% del grupo de Insomnia), eso quiere decir que son perfiles atípicos o con datos menos densos o incluso probable error de captura o falsedad de datos.
 
 Por lo tanto le atina en un 90 % a los que tienen apnea del sueño en los clusteres 2 y 3, y para el cluster 1 a los que tienen None, sin embargo, se nota que se confunde en este grupo, como si fueran los que menos te preocuparan, clínicamente puede ser que sea el mejor
+
+
+Solo para validar, buscaré el mejor parámetro con el gridsearch.
+
+
+```{r}
+library(purrr)
+
+# Define el espacio de parámetros
+param_grid <- expand.grid(
+  eps = seq(0.15, 0.30, 0.01),       # ajusta según tu curva kNN
+  minPts = seq(11, 24, 1)
+)
+
+df_input <- model.matrix(~ . -1, data = df_clean)
+
+# Aplica DBSCAN a cada combinación
+resultados <- pmap(param_grid, function(eps, minPts) {
+  dbscan(df_input, eps = eps, minPts = minPts)
+})
+
+```
+
+Evaluar el resulado
+```{r}
+param_grid$n_clusters <- map_int(resultados, ~ length(unique(.x$cluster)) - 1)
+param_grid$n_noise <- map_int(resultados, ~ sum(.x$cluster == 0))
+
+```
+
+
+```{r}
+library(dplyr)
+
+param_grid %>%
+  arrange(n_noise) %>%
+  head(10)
+
+```
+
+Mmm, por lo tanto, corroboramos que la métrica de Gower es lo mejor, adicionalmente, los parámetros me salieron muy similares a las que propuse con los quantiles, lo cual no sale taan descabellado escogerlos, por lo tanto, nos quedamos con las conclusiones pasadas.
+
 
 ## HDBSCAN
 
