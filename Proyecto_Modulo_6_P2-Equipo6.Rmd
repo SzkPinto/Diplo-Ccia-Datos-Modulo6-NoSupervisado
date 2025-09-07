@@ -53,7 +53,7 @@ aplicables en el ámbito de la salud y el bienestar.
 
 Activación librerías
 ```{r, message=FALSE, warning=FALSE}
-source('R-libraries-ICdD.r')
+source('R-libraries-ICdD_p2.r')
 ```
 
 Importación la información
