@@ -73,7 +73,7 @@ Se usará como variable clasificatoria "Sleep.Disorder" o Transtorno del sueño.
 
 Activación librerías
 ```{r, message=FALSE, warning=FALSE}
-source('R-libraries-ICdD.r')
+source('R-libraries-ICdD_p2.r')
 library(webshot2)
 library(rgl)      
 knitr::opts_chunk$set()  
