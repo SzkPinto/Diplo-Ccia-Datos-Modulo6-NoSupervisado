@@ -1,6 +1,13 @@
 ---
 title: "Proyecto- Módulo 6 - Parte 2 "
-author: "Equipo 6"
+author:
+  - "Morales González Susan"
+  - "Pinto González Reyna Suzuky"
+  - "Reyes Román Eduardo"
+  - "Ruiz Jiménez Reynaldo David"
+  - "Vital Arana José Andrés de Jesús"
+  - "Zetina Rosas Enya"
+  - "Equipo 6:"
 date: "2025-09-04"
 output:
   html_document:
@@ -9,11 +16,16 @@ output:
     toc_float:
       collapsed: false
       smooth_scroll: true
+    theme: readable
+    highlight: tango
     number_sections: true
     df_print: paged
   pdf_document:
     toc: true
     number_sections: true
+header-includes:
+  - \usepackage[spanish]{babel}
+always_allow_html: true
 ---
 # Introducción 
 
@@ -1165,11 +1177,14 @@ tabla_bonita %>%
 ```
 
 **Nuestras conclusiones en DBSCAN son**:
- + Cluster 1: Dominado por personas sin trasnstorno y por el grupo con algo de insomnia
- + Cluster 2 y 3 está dominado por Sleep Apnea con un más del 90 por ciento. Esto nos revela que DBSCAN logró identificar patrones fisiolóigios o de estilo de vida asociado a la apnea
- + Ruido o grupo O: Aunque tiene 9 observaciones, 5 es de Apnea que representa el 7.35% del total de apnea (es decir el 92.65 % de los pacientes son identificados correctamente) y 4 de Insomnia ( es el 5% del grupo de Insomnia), eso quiere decir que son perfiles atípicos o con datos menos densos o incluso probable error de captura o falsedad de datos.
 
-Por lo tanto le atina en un 90 % a los que tienen apnea del sueño en los clusteres 2 y 3, y para el cluster 1 a los que tienen None, sin embargo, se nota que se confunde en este grupo, como si fueran los que menos te preocuparan, clínicamente puede ser que sea el mejor
+ + **Cluster 1**: Dominado por personas sin trasnstorno y por el grupo con algo de insomnia.
+ 
+ + **Cluster 2 y 3**: están dominados por Sleep Apnea con un más del 90 por ciento. Esto nos revela que DBSCAN logró identificar patrones fisiolóigios o de estilo de vida asociado a la apnea del sueño.
+ 
+ + **Ruido o grupo O**: Aunque tiene 9 observaciones, 5 es de Apnea que representa el 7.35% del total de apnea (es decir el 92.65 % de los pacientes son identificados correctamente) y 4 de Insomnia ( es el 5% del grupo de Insomnia), eso quiere decir que son perfiles atípicos o con datos menos densos o incluso probable error de captura o falsedad de datos.
+
++ **Por lo tanto**: tiene una presición de un 90 % con el grupo que tiene apnea del sueño en los clusteres 2 y 3, y para el cluster 1 a los que tienen None, sin embargo, se nota que se confunde en este grupo, como si fueran los que menos te preocuparan, clínicamente puede ser que sea el mejor
 
 
 Solo para validar, buscaré el mejor parámetro con el gridsearch.
@@ -1210,7 +1225,7 @@ param_grid %>%
 
 ```
 
-Mmm, por lo tanto, corroboramos que la métrica de Gower es lo mejor, adicionalmente, los parámetros me salieron muy similares a las que propuse con los quantiles, lo cual no sale taan descabellado escogerlos, por lo tanto, nos quedamos con las conclusiones pasadas.
+Por lo tanto, corroboramos que la métrica de Gower es la mejor medida para poder segmentar a la población, adicionalmente, los parámetros salieron muy similares a las que propuse con los quantiles, lo cual no sale taan descabellado escoger estos parámetros, por lo tanto, nos quedamos con las conclusiones pasadas.
 
 ## OPTICS
 
@@ -1601,18 +1616,25 @@ cat(paste0("- ", concs, collapse = "\n"))
 
 
 # Conclusiones generales
+
 El análisis de clustering aplicado al conjunto de datos Sleep Health and Lifestyle revela patrones complejos que no se alinean perfectamente con las etiquetas de diagnóstico preexistente. A través de la comparación de seis algoritmos distintos, se han obtenido los siguientes hallazgos clave:
-1. Consistencia en el Número de Grupos (3-4 Clusters)
+
+1.- Consistencia en el Número de Grupos (3-4 Clusters)
 Tanto los métodos de partición (K-Means, K-Medoids) como los basados en densidad (DBSCAN, HDBSCAN y OPTICS) sugieren de manera consistente que la estructura óptima de los datos se encuentra entre tres y cuatro conglomerados. Esta convergencia entre diferentes enfoques refuerza la idea de que existen de 3 a 4 perfiles de pacientes naturalmente distinguibles en función de sus variables de estilo de vida y salud.
-2. Separación Clara del Grupo "Saludable"
+
+2.- Separación Clara del Grupo "Saludable"
 Una conclusión transversal a casi todos los algoritmos es su capacidad para identificar y aislar de manera efectiva al grupo de individuos sin trastorno del sueño ("None"). K-Means, en particular, demuestra una alta precisión en la creación de un cluster que agrupa a la mayoría de estos individuos, sugiriendo que el perfil de una persona "saludable" es significativamente distinto y homogéneo.
-3. Dificultad para Distinguir entre "Insomnio" y "Apnea del Sueño"
+
+3.- Dificultad para Distinguir entre "Insomnio" y "Apnea del Sueño"
 El hallazgo más significativo del estudio es que ninguno de los algoritmos logró separar de forma limpia y consistente a los pacientes diagnosticados con Insomnio de aquellos con Apnea del Sueño. Ambos grupos tienden a ser mezclados en los mismos clusters por la mayoría de los métodos exceptuando algunos como el caso de DBSCAN que agrupa en dos grupos a los de Insomnio, pero mezcla los individos de Apnea del sueño y sin problemas. Esto sugiere dos posibles interpretaciones:
+
 - **Perfiles Similares**: Las variables medidas en este dataset (nivel de estrés, actividad física, frecuencia cardíaca, etc.) podrían no ser suficientes para diferenciar los perfiles de estilo de vida de una persona con insomnio frente a una con apnea. Ambas condiciones podrían compartir características comunes que las hacen indistinguibles para los algoritmos.
+
 - **Subgrupos No Descubiertos**: Es posible que existan subgrupos dentro de los datos que son más relevantes que el diagnóstico clínico. Por ejemplo, podría haber un cluster de "alto estrés" que incluye tanto a personas con insomnio como con apnea.
-4. Superioridad de los Métodos Basados en Densidad para Estructuras Complejas
+4.- Superioridad de los Métodos Basados en Densidad para Estructuras Complejas
 Mientras que K-Means y K-Medoids forzaron a cada punto a pertenecer a un cluster, HDBSCAN destacó al identificar una estructura más matizada. La capacidad de este algoritmo para marcar puntos como "ruido" (Cluster 0) y su flexibilidad para encontrar grupos de diferentes densidades, lo posicionan como el método más robusto para este conjunto de datos. El hecho de que HDBSCAN también converja en 3 clusters principales (excluyendo el ruido) le da una gran credibilidad a esta estructura.
-Conclusión Final
+
+- **Conclusión Final:**
 En resumen, el aprendizaje no supervisado ha demostrado que, si bien la etiqueta de diagnóstico es útil, la segmentación natural de los datos de estilo de vida y salud revela una historia más compleja. Existe una clara distinción entre individuos sanos y aquellos con algún padecimiento. Sin embargo, los datos sugieren que las diferencias entre Insomnio y Apnea del Sueño son sutiles y no se reflejan claramente en las variables disponibles.
 Para futuros análisis, sería crucial la incorporación de variables adicionales (posiblemente más datos clínicos o fisiológicos específicos) y la validación de los clusters encontrados por un experto en medicina del sueño. Esto podría confirmar si los grupos identificados por los algoritmos representan perfiles de riesgo o fenotipos de pacientes que actualmente no se capturan con las etiquetas de diagnóstico tradicionales.
 
