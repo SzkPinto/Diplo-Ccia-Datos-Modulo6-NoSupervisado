@@ -1600,21 +1600,21 @@ cat(paste0("- ", concs, collapse = "\n"))
 ```
 
 
-# Conclusiones generales 
-
-En general los algoritmos generan una recomendación entre tres y cuatro grupos; K Means y k Medoids recomiendan cuatro, DBSCAN y HDBSCAN recomiendan tres.
-Cuando cruzamos los resultados de cada Clústeres versus la etiqueta de Sueño, en general encontramos mezclas; en el caso de:
-
-## k-Means segmenta adecuadamente los pacientes sin padecimientos, pero lo que tienen algún padecimiento los mezcla, por lo que bajo este método podríamos concluir dos grupos con padecimiento y sin padecimiento.
-## K Medois:
-## DBSCAN:
-## HDBSCAN:
-
-Descartamos CLARA y Optics ya que no son extremosos los resultados, es decir, generan doce o un solo grupo.
-Por lo tanto, es necesario discutir con un experto de área los resultados para seleccionar el modelo que tenga una mejo contextualización
-
-
-
+# Conclusiones generales
+El análisis de clustering aplicado al conjunto de datos Sleep Health and Lifestyle revela patrones complejos que no se alinean perfectamente con las etiquetas de diagnóstico preexistente. A través de la comparación de seis algoritmos distintos, se han obtenido los siguientes hallazgos clave:
+1. Consistencia en el Número de Grupos (3-4 Clusters)
+Tanto los métodos de partición (K-Means, K-Medoids) como los basados en densidad (DBSCAN, HDBSCAN y OPTICS) sugieren de manera consistente que la estructura óptima de los datos se encuentra entre tres y cuatro conglomerados. Esta convergencia entre diferentes enfoques refuerza la idea de que existen de 3 a 4 perfiles de pacientes naturalmente distinguibles en función de sus variables de estilo de vida y salud.
+2. Separación Clara del Grupo "Saludable"
+Una conclusión transversal a casi todos los algoritmos es su capacidad para identificar y aislar de manera efectiva al grupo de individuos sin trastorno del sueño ("None"). K-Means, en particular, demuestra una alta precisión en la creación de un cluster que agrupa a la mayoría de estos individuos, sugiriendo que el perfil de una persona "saludable" es significativamente distinto y homogéneo.
+3. Dificultad para Distinguir entre "Insomnio" y "Apnea del Sueño"
+El hallazgo más significativo del estudio es que ninguno de los algoritmos logró separar de forma limpia y consistente a los pacientes diagnosticados con Insomnio de aquellos con Apnea del Sueño. Ambos grupos tienden a ser mezclados en los mismos clusters por la mayoría de los métodos exceptuando algunos como el caso de DBSCAN que agrupa en dos grupos a los de Insomnio, pero mezcla los individos de Apnea del sueño y sin problemas. Esto sugiere dos posibles interpretaciones:
+- **Perfiles Similares**: Las variables medidas en este dataset (nivel de estrés, actividad física, frecuencia cardíaca, etc.) podrían no ser suficientes para diferenciar los perfiles de estilo de vida de una persona con insomnio frente a una con apnea. Ambas condiciones podrían compartir características comunes que las hacen indistinguibles para los algoritmos.
+- **Subgrupos No Descubiertos**: Es posible que existan subgrupos dentro de los datos que son más relevantes que el diagnóstico clínico. Por ejemplo, podría haber un cluster de "alto estrés" que incluye tanto a personas con insomnio como con apnea.
+4. Superioridad de los Métodos Basados en Densidad para Estructuras Complejas
+Mientras que K-Means y K-Medoids forzaron a cada punto a pertenecer a un cluster, HDBSCAN destacó al identificar una estructura más matizada. La capacidad de este algoritmo para marcar puntos como "ruido" (Cluster 0) y su flexibilidad para encontrar grupos de diferentes densidades, lo posicionan como el método más robusto para este conjunto de datos. El hecho de que HDBSCAN también converja en 3 clusters principales (excluyendo el ruido) le da una gran credibilidad a esta estructura.
+Conclusión Final
+En resumen, el aprendizaje no supervisado ha demostrado que, si bien la etiqueta de diagnóstico es útil, la segmentación natural de los datos de estilo de vida y salud revela una historia más compleja. Existe una clara distinción entre individuos sanos y aquellos con algún padecimiento. Sin embargo, los datos sugieren que las diferencias entre Insomnio y Apnea del Sueño son sutiles y no se reflejan claramente en las variables disponibles.
+Para futuros análisis, sería crucial la incorporación de variables adicionales (posiblemente más datos clínicos o fisiológicos específicos) y la validación de los clusters encontrados por un experto en medicina del sueño. Esto podría confirmar si los grupos identificados por los algoritmos representan perfiles de riesgo o fenotipos de pacientes que actualmente no se capturan con las etiquetas de diagnóstico tradicionales.
 
 
 
