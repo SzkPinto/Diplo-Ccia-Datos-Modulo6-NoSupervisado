@@ -87,7 +87,7 @@ suppressWarnings(suppressMessages({
     message("Nota: 'aricode' no está instalado; NMI se omitirá a menos que lo instales.")
   }
 }))
-install.packages("aricode", dependencies = TRUE)
+#install.packages("aricode", dependencies = TRUE)
 library(aricode)
 
 
@@ -112,7 +112,6 @@ library(gridExtra)
 library(grid)
 library(lattice)
 require(igraph)
-install.packages("umap")
 library(umap)
 
 df %>% glimpse()
